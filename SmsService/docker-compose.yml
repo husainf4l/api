@@ -40,7 +40,7 @@ services:
       - POSTGRES_PASSWORD=tt55oo77
       - POSTGRES_DB=aqlaansms
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
