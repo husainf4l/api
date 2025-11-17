@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "D6WY9xUVgaI=",
+  "success": true,
+  "projectFilePath": "/home/husain/api/SmsService/SmsService.csproj",
+  "expectedPackageFiles": [
+    "/home/husain/.nuget/packages/microsoft.aspnetcore.openapi/10.0.0/microsoft.aspnetcore.openapi.10.0.0.nupkg.sha512",
+    "/home/husain/.nuget/packages/microsoft.openapi/2.0.0/microsoft.openapi.2.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}
