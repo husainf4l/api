@@ -10,36 +10,13 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Username=husain;Password=tt55oo77;Database=aqlaanauth
+      - ConnectionStrings__DefaultConnection=Host=149.200.251.12;Port=5432;Username=husain;Password=tt55oo77;Database=aqlaanauth
       - Jwt__Key=your-super-secret-jwt-key-that-should-be-at-least-256-bits-long-for-production
       - Jwt__Issuer=https://auth.yourdomain.com
       - Jwt__Audience=your-microservices
-    depends_on:
-      postgres:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-
-  postgres:
-    image: postgres:16
-    environment:
-      - POSTGRES_USER=husain
-      - POSTGRES_PASSWORD=tt55oo77
-      - POSTGRES_DB=aqlaanauth
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U husain -d aqlaanauth"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  postgres_data:
