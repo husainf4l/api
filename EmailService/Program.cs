@@ -4,15 +4,25 @@ using EmailService.Data;
 using EmailService.GraphQL;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
+using DotNetEnv;
+
+// Load environment variables from .env file
+Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Add environment variables to configuration
+builder.Configuration.AddEnvironmentVariables();
+
+// Add environment variables to configuration
+builder.Configuration.AddEnvironmentVariables();
 
 // Add services to the container
 builder.Services.AddGraphQLServer()
     .AddQueryType<EmailQueries>()
     .AddMutationType<EmailMutations>()
-    .AddAuthorization()
-    .AddHttpRequestInterceptor<GraphQLAuthInterceptor>();
+    .AddHttpRequestInterceptor<GraphQLAuthInterceptor>()
+    .ModifyRequestOptions(opt => opt.IncludeExceptionDetails = builder.Environment.IsDevelopment());
 
 // Configure PostgreSQL Database
 builder.Services.AddDbContext<EmailDbContext>(options =>
@@ -49,6 +59,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapGraphQL("/email/graphql");
+app.MapGraphQL();
 
 app.Run();

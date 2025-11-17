@@ -1,12 +1,10 @@
 using EmailService.GraphQL.Types;
 using EmailService.Services;
-using HotChocolate.Authorization;
 
 namespace EmailService.GraphQL;
 
 public class EmailMutations
 {
-    [Authorize(Policy = "ApiKey")]
     public async Task<EmailResult> SendEmailAsync(
         SendEmailInput input,
         [Service] IEmailService emailService)
@@ -14,7 +12,6 @@ public class EmailMutations
         return await emailService.SendEmailAsync(input);
     }
 
-    [Authorize(Policy = "ApiKey")]
     public GenerateHtmlResult GenerateHtml(GenerateHtmlInput input)
     {
         var html = GenerateHtmlTemplate(input);
