@@ -58,29 +58,43 @@ public class AuthService
                 Email = request.Email,
                 NormalizedEmail = request.Email.ToUpper(),
                 PasswordHash = HashPassword(request.Password),
-                IsEmailVerified = false, // TODO: Implement email verification
+                IsEmailVerified = false,
                 PhoneNumber = request.PhoneNumber,
                 TwoFactorEnabled = false,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
 
-            _context.Users.Add(user);
-
-            // Create default role assignment (if roles exist)
-            var defaultRole = await _context.Roles
-                .FirstOrDefaultAsync(r => r.ApplicationId == application.Id && r.Name.ToLower() == "user");
-
-            if (defaultRole != null)
+            // Assign single role
+            if (!string.IsNullOrEmpty(request.Role))
             {
-                var userRole = new UserRole
+                var role = await _context.Roles
+                    .FirstOrDefaultAsync(r => r.ApplicationId == application.Id && r.Name == request.Role);
+
+                if (role != null)
                 {
-                    UserId = user.Id,
-                    RoleId = defaultRole.Id
-                };
-                _context.UserRoles.Add(userRole);
+                    user.RoleId = role.Id;
+                    _logger.LogInformation("Assigned role {RoleName} to user {Email}", request.Role, user.Email);
+                }
+                else
+                {
+                    _logger.LogWarning("Role {RoleName} not found for application {ApplicationCode}", request.Role, application.Code);
+                }
+            }
+            else
+            {
+                // Assign default "User" role if exists
+                var defaultRole = await _context.Roles
+                    .FirstOrDefaultAsync(r => r.ApplicationId == application.Id && r.Name.ToLower() == "user");
+
+                if (defaultRole != null)
+                {
+                    user.RoleId = defaultRole.Id;
+                    _logger.LogInformation("Assigned default 'User' role to {Email}", user.Email);
+                }
             }
 
+            _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
             // Send email verification
@@ -122,7 +136,7 @@ public class AuthService
                     ApplicationId = application.Id,
                     ApplicationCode = application.Code,
                     ApplicationName = application.Name,
-                    Roles = roles,
+                    Role = roles,
                     IsEmailVerified = user.IsEmailVerified,
                     CreatedAt = user.CreatedAt,
                     LastLoginAt = user.LastLoginAt
@@ -211,7 +225,7 @@ public class AuthService
                     ApplicationId = application.Id,
                     ApplicationCode = application.Code,
                     ApplicationName = application.Name,
-                    Roles = roles,
+                    Role = roles,
                     IsEmailVerified = user.IsEmailVerified,
                     CreatedAt = user.CreatedAt,
                     LastLoginAt = user.LastLoginAt
@@ -235,14 +249,13 @@ public class AuthService
         return BCrypt.Net.BCrypt.Verify(password, hashedPassword);
     }
 
-    private async Task<List<string>> GetUserRolesAsync(Guid userId)
+    private async Task<string?> GetUserRolesAsync(Guid userId)
     {
-        var roles = await _context.UserRoles
-            .Where(ur => ur.UserId == userId)
-            .Select(ur => ur.Role.Name)
-            .ToListAsync();
+        var user = await _context.Users
+            .Include(u => u.Role)
+            .FirstOrDefaultAsync(u => u.Id == userId);
 
-        return roles;
+        return user?.Role?.Name;
     }
 
     private async Task LogSessionAsync(Guid userId, Guid applicationId, bool isSuccessful, string? ipAddress, string? userAgent)

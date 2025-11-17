@@ -61,13 +61,14 @@ public class TokenController : ControllerBase
             var user = refreshTokenEntity.User;
             var application = refreshTokenEntity.Application;
 
-            // Get user roles
-            var roles = await _context.UserRoles
-                .Where(ur => ur.UserId == user.Id)
-                .Select(ur => ur.Role.Name)
-                .ToListAsync();
+            // Get user role
+            var userWithRole = await _context.Users
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.Id == user.Id);
 
-            var accessToken = _jwtTokenService.GenerateAccessToken(user, application, roles);
+            var role = userWithRole?.Role?.Name;
+
+            var accessToken = _jwtTokenService.GenerateAccessToken(user, application, role);
             var newRefreshToken = _jwtTokenService.GenerateRefreshToken();
 
             // Store new refresh token
@@ -110,7 +111,7 @@ public class TokenController : ControllerBase
                         ApplicationId = application.Id,
                         ApplicationCode = application.Code,
                         ApplicationName = application.Name,
-                        Roles = roles,
+                        Role = role,
                         IsEmailVerified = user.IsEmailVerified,
                         CreatedAt = user.CreatedAt,
                         LastLoginAt = user.LastLoginAt

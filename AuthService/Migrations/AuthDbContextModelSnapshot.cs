@@ -305,6 +305,9 @@ namespace AuthService.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<Guid?>("RoleId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("TwoFactorBackupCodes")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -319,6 +322,8 @@ namespace AuthService.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("NormalizedEmail");
+
+                    b.HasIndex("RoleId");
 
                     b.HasIndex("ApplicationId", "NormalizedEmail")
                         .IsUnique();
@@ -484,7 +489,14 @@ namespace AuthService.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("AuthService.Models.Entities.Role", "Role")
+                        .WithMany("Users")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Application");
+
+                    b.Navigation("Role");
                 });
 
             modelBuilder.Entity("AuthService.Models.Entities.UserExternalLogin", b =>
@@ -532,6 +544,8 @@ namespace AuthService.Migrations
 
             modelBuilder.Entity("AuthService.Models.Entities.Role", b =>
                 {
+                    b.Navigation("Users");
+
                     b.Navigation("UserRoles");
                 });
 
@@ -540,6 +554,8 @@ namespace AuthService.Migrations
                     b.Navigation("ApiKeys");
 
                     b.Navigation("RefreshTokens");
+
+                    b.Navigation("Role");
 
                     b.Navigation("SessionLogs");
 

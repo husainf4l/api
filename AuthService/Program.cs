@@ -19,7 +19,11 @@ builder.Services.AddSwaggerGen();
 
 // Configure Entity Framework with PostgreSQL
 builder.Services.AddDbContext<AuthDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+{
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.ConfigureWarnings(warnings => 
+        warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+});
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
@@ -145,6 +149,9 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<ApiKeyService>();
 builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
 builder.Services.AddScoped<IExternalLoginService, ExternalLoginService>();
+
+// Add HttpClient for email service
+builder.Services.AddHttpClient();
 
 // Register email service (use console service in development, real service in production)
 if (builder.Environment.IsDevelopment())

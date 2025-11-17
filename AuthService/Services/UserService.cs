@@ -163,7 +163,7 @@ public class UserService
         return await _roleService.RemoveRoleFromUserAsync(userId, roleId);
     }
 
-    public async Task<List<string>> GetUserRolesAsync(Guid userId)
+    public async Task<string?> GetUserRolesAsync(Guid userId)
     {
         return await _roleService.GetUserRolesAsync(userId);
     }

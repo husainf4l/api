@@ -16,7 +16,7 @@ public class JwtTokenService
         _configuration = configuration;
     }
 
-    public string GenerateAccessToken(User user, Application application, List<string> roles)
+    public string GenerateAccessToken(User user, Application application, string? role)
     {
         var jwtSettings = _configuration.GetSection("Jwt");
         var secret = jwtSettings["Secret"] ?? throw new InvalidOperationException("JWT Secret not configured");
@@ -38,10 +38,10 @@ public class JwtTokenService
             new Claim(JwtRegisteredClaimNames.Exp, DateTimeOffset.UtcNow.AddMinutes(accessTokenExpiryMinutes).ToUnixTimeSeconds().ToString())
         };
 
-        // Add roles as claims
-        foreach (var role in roles)
+        // Add role as claim
+        if (!string.IsNullOrEmpty(role))
         {
-            claims.Add(new Claim("roles", role));
+            claims.Add(new Claim("role", role));
         }
 
         var token = new JwtSecurityToken(
@@ -141,9 +141,10 @@ public class JwtTokenService
         return null;
     }
 
-    public List<string> GetRolesFromToken(string token)
+    public string? GetRoleFromToken(string token)
     {
         var claims = ExtractClaims(token);
-        return claims.Where(c => c.Key == "roles").Select(c => c.Value).ToList();
+        claims.TryGetValue("role", out var role);
+        return role;
     }
 }

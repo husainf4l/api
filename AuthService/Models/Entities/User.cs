@@ -43,11 +43,17 @@ public class User
 
     public bool IsActive { get; set; } = true;
 
+    // Single role per user
+    public Guid? RoleId { get; set; }
+
     // Navigation properties
     [ForeignKey(nameof(ApplicationId))]
     public virtual Application Application { get; set; } = null!;
 
-    public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
+    [ForeignKey(nameof(RoleId))]
+    public virtual Role? Role { get; set; }
+
+    public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>(); // Keep for backward compatibility but deprecated
     public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public virtual ICollection<SessionLog> SessionLogs { get; set; } = new List<SessionLog>();
     public virtual ICollection<ApiKey> ApiKeys { get; set; } = new List<ApiKey>();

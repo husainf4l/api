@@ -1,5 +1,6 @@
 using AuthService.Models.DTOs;
 using AuthService.Services;
+using AuthService.Middleware;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,7 +8,8 @@ namespace AuthService.Controllers;
 
 [ApiController]
 [Route("admin/{appCode}/api-keys")]
-[Authorize] // Require authentication for all admin endpoints
+[Authorize]
+[RequireRole("SuperAdmin")] // Only SuperAdmin can manage API keys
 public class ApiKeysController : ControllerBase
 {
     private readonly ApplicationService _applicationService;

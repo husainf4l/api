@@ -27,7 +27,7 @@ public class DetailsModel : PageModel
     public new UserDto? User { get; set; }
     public ApplicationDto? Application { get; set; }
     public List<string> AvailableRoles { get; set; } = new();
-    public List<string> UserRoles { get; set; } = new();
+    public string? UserRole { get; set; }
     public List<SessionLogDto> Sessions { get; set; } = new();
     public string? SuccessMessage { get; set; }
     public string? ErrorMessage { get; set; }
@@ -265,10 +265,10 @@ public class DetailsModel : PageModel
     {
         if (Application == null) return;
 
-        UserRoles = await _userService.GetUserRolesAsync(Id);
+        UserRole = await _userService.GetUserRolesAsync(Id);
         var allRoles = await _roleService.GetRolesByApplicationAsync(Application.Id);
         AvailableRoles = allRoles
-            .Where(r => !UserRoles.Contains(r.Name))
+            .Where(r => UserRole == null || r.Name != UserRole)
             .Select(r => r.Name)
             .ToList();
     }

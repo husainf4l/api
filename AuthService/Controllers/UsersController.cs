@@ -1,5 +1,6 @@
 using AuthService.Models.DTOs;
 using AuthService.Services;
+using AuthService.Middleware;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,7 +8,8 @@ namespace AuthService.Controllers;
 
 [ApiController]
 [Route("admin/{appCode}/users")]
-[Authorize] // Require authentication for all admin endpoints
+[Authorize] // Require authentication
+[RequireRole("Admin")] // Require Admin role
 public class UsersController : ControllerBase
 {
     private readonly ApplicationService _applicationService;

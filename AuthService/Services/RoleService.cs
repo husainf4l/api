@@ -139,19 +139,20 @@ public class RoleService
         }
     }
 
-    public async Task<List<string>> GetUserRolesAsync(Guid userId)
+    public async Task<string?> GetUserRolesAsync(Guid userId)
     {
         try
         {
-            return await _context.UserRoles
-                .Where(ur => ur.UserId == userId)
-                .Select(ur => ur.Role.Name)
-                .ToListAsync();
+            var user = await _context.Users
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            return user?.Role?.Name;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting roles for user {UserId}", userId);
-            return new List<string>();
+            _logger.LogError(ex, "Error getting role for user {UserId}", userId);
+            return null;
         }
     }
 

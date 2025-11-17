@@ -1,4 +1,5 @@
 using AuthService.Services;
+using AuthService.Middleware;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,6 +8,7 @@ namespace AuthService.Controllers;
 [ApiController]
 [Route("admin/{appCode}/roles")]
 [Authorize]
+[RequireRole("Admin")] // Only Admin can manage roles
 public class RolesController : ControllerBase
 {
     private readonly RoleService _roleService;

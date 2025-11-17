@@ -24,4 +24,11 @@ public class RegisterRequest
 
     public string? FirstName { get; set; }
     public string? LastName { get; set; }
+
+    /// <summary>
+    /// Optional: Role name to assign to the user during registration.
+    /// If not provided, will attempt to assign default "User" role if it exists.
+    /// Each user can only have ONE role.
+    /// </summary>
+    public string? Role { get; set; }
 }

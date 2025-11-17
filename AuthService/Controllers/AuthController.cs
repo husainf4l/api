@@ -1,5 +1,6 @@
 using AuthService.Models.DTOs;
 using AuthService.Services;
+using AuthService.Middleware;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.IdentityModel.Tokens.Jwt;
@@ -8,6 +9,7 @@ namespace AuthService.Controllers;
 
 [ApiController]
 [Route("api/auth")]
+// [RequireApiKey] // Temporarily disabled for bootstrap
 public class AuthController : ControllerBase
 {
     private readonly Services.AuthService _authService;
@@ -157,7 +159,7 @@ public class AuthController : ControllerBase
             // Extract user information from token
             var userId = _jwtTokenService.GetUserIdFromToken(token);
             var applicationId = _jwtTokenService.GetApplicationIdFromToken(token);
-            var roles = _jwtTokenService.GetRolesFromToken(token);
+            var role = _jwtTokenService.GetRoleFromToken(token);
 
             if (!userId.HasValue || !applicationId.HasValue)
             {
@@ -183,7 +185,7 @@ public class AuthController : ControllerBase
                     application_id = applicationId.Value,
                     application_code = claims.GetValueOrDefault("app", ""),
                     application_name = claims.GetValueOrDefault("app_name", ""),
-                    roles = roles,
+                    role = role,
                     is_email_verified = false, // TODO: Get from database
                     created_at = DateTime.UtcNow, // TODO: Get from database
                     last_login_at = DateTime.UtcNow // TODO: Get from database

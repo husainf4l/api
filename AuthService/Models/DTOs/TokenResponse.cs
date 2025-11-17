@@ -16,7 +16,7 @@ public class TokenResponse
         public Guid ApplicationId { get; set; }
         public string ApplicationCode { get; set; } = string.Empty;
         public string ApplicationName { get; set; } = string.Empty;
-        public List<string> Roles { get; set; } = new();
+        public string? Role { get; set; }
         public bool IsEmailVerified { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? LastLoginAt { get; set; }
