@@ -1,0 +1,120 @@
+# Sample GraphQL Queries and Mutations for WhatsApp API
+
+## Queries
+
+### List all message templates
+query ListTemplates {
+  listTemplates {
+    data {
+      id
+      name
+      language
+      status
+      category
+    }
+    paging
+  }
+}
+
+### Get token information (debugging)
+query GetTokenInfo {
+  getTokenInfo
+}
+
+## Mutations
+
+### Send a simple template message (hello_world)
+mutation SendHelloWorld {
+  sendTemplateMessage(
+    to: "1234567890"
+    templateName: "hello_world"
+    language: "en_US"
+  ) {
+    messagingProduct
+    contacts {
+      input
+      waId
+    }
+    messages {
+      id
+    }
+  }
+}
+
+### Send template with parameters
+mutation SendTemplateWithParams {
+  sendTemplateMessage(
+    to: "1234567890"
+    templateName: "cv_received_notification"
+    language: "en"
+    parameters: ["John Doe"]
+  ) {
+    contacts {
+      waId
+    }
+    messages {
+      id
+    }
+  }
+}
+
+### Send template with button parameter (temppassword)
+mutation SendTempPassword {
+  sendTemplateMessage(
+    to: "1234567890"
+    templateName: "temppassword"
+    language: "en_US"
+    parameters: ["ABC123"]
+  ) {
+    contacts {
+      waId
+    }
+    messages {
+      id
+    }
+  }
+}
+
+### Send a text message
+mutation SendTextMessage {
+  sendTextMessage(
+    to: "1234567890"
+    text: "Hello! This is a test message from GraphQL."
+  ) {
+    messagingProduct
+    contacts {
+      input
+      waId
+    }
+    messages {
+      id
+    }
+  }
+}
+
+### Clear token cache (useful for debugging)
+mutation ClearCache {
+  clearTokenCache
+}
+
+## Variables Example
+
+### You can also use variables in your queries:
+mutation SendTemplateWithVariables($to: String!, $templateName: String!, $params: [String!]) {
+  sendTemplateMessage(
+    to: $to
+    templateName: $templateName
+    parameters: $params
+  ) {
+    messages {
+      id
+    }
+  }
+}
+
+# Variables:
+# {
+#   "to": "1234567890",
+#   "templateName": "hello_world",
+#   "params": []
+# }
