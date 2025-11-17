@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  sms-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sms-service
+    ports:
+      - "5103:5103"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5103
+      # Database connection
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=aqlaansms;Username=husain;Password=tt55oo77
+      # JOSMS Settings
+      - JosmsSettings__BaseUrl=https://www.josms.net
+      - JosmsSettings__AccName=margogroup
+      - JosmsSettings__AccPassword=nR@9g@Z7yV0@sS9bX1y
+      - JosmsSettings__DefaultSenderId=MargoGroup
+      # API Key
+      - ApiSettings__ApiKey=sms-prod-o02az0sVxwe2YtKhRXoB+XFB9u4FxGU2h8zO/sjU+9I=
+    networks:
+      - sms-network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5103/graphql", "-H", "Content-Type: application/json", "-d", "{\"query\":\"{health}\"}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: sms-postgres
+    environment:
+      - POSTGRES_USER=husain
+      - POSTGRES_PASSWORD=tt55oo77
+      - POSTGRES_DB=aqlaansms
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - sms-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U husain -d aqlaansms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  sms-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
