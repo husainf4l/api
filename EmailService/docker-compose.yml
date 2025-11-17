@@ -34,6 +34,7 @@ services:
       - AWS_SECRET_ACCESS_KEY=evBK9EWyJeQxdnTbRMeaPUjGKtONInvC3tNcPdlV
       - AWS_REGION=me-central-1
       - ApiSettings__ApiKey=dev-email-service-key-2024
+      - EmailSettings__FromEmail=no-reply@aqlaan.com
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=aqlaanemail;Username=husain;Password=tt55oo77
     depends_on:
       postgres:
