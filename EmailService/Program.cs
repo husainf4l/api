@@ -59,6 +59,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapGraphQL();
+app.MapGraphQL("/email/graphql");
 
 app.Run();
