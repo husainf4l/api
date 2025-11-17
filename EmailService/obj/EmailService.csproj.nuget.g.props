@@ -12,4 +12,8 @@
   <ItemGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
     <SourceRoot Include="/home/husain/.nuget/packages/" />
   </ItemGroup>
+  <PropertyGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
+    <PkgAWSSDK_Core Condition=" '$(PkgAWSSDK_Core)' == '' ">/home/husain/.nuget/packages/awssdk.core/3.7.300.17</PkgAWSSDK_Core>
+    <PkgAWSSDK_SimpleEmail Condition=" '$(PkgAWSSDK_SimpleEmail)' == '' ">/home/husain/.nuget/packages/awssdk.simpleemail/3.7.300.17</PkgAWSSDK_SimpleEmail>
+  </PropertyGroup>
 </Project>

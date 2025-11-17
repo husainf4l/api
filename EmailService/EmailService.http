@@ -1,6 +1,47 @@
 @EmailService_HostAddress = http://localhost:5189
 
-GET {{EmailService_HostAddress}}/weatherforecast/
-Accept: application/json
+### Health Check
+GET {{EmailService_HostAddress}}/api/email/health
+
+###
+
+### Send Plain Text Email
+POST {{EmailService_HostAddress}}/api/email/send
+Content-Type: application/json
+
+{
+  "to": "husain.f4l@gmail.com",
+  "subject": "Hello World",
+  "body": "Hello World",
+  "isHtml": false
+}
+
+###
+
+### Send HTML Email
+POST {{EmailService_HostAddress}}/api/email/send
+Content-Type: application/json
+
+{
+  "to": "husain.f4l@gmail.com",
+  "subject": "Welcome to EmailService",
+  "body": "<h1>Welcome!</h1><p>This is a <strong>formatted</strong> HTML email from the EmailService.</p>",
+  "isHtml": true
+}
+
+###
+
+### Send Email with CC and BCC
+POST {{EmailService_HostAddress}}/api/email/send
+Content-Type: application/json
+
+{
+  "to": "husain.f4l@gmail.com",
+  "cc": "admin@rolevate.com",
+  "bcc": "info@aqlaan.com",
+  "subject": "Team Notification",
+  "body": "This email has been sent to multiple recipients.",
+  "isHtml": false
+}
 
 ###
