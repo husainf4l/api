@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  emailservice:
+    build:
+      context: .
+      dockerfile: EmailService/Dockerfile
+    container_name: emailservice
+    ports:
+      - "5189:5189"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - ApiSettings__ApiKey=${API_KEY}
+    env_file:
+      - EmailService/.env
+    restart: unless-stopped
+    networks:
+      - emailservice-network
+
+networks:
+  emailservice-network:
+    driver: bridge
