@@ -7,7 +7,7 @@ using System.IdentityModel.Tokens.Jwt;
 namespace AuthService.Controllers;
 
 [ApiController]
-[Route("auth")]
+[Route("api/auth")]
 public class AuthController : ControllerBase
 {
     private readonly Services.AuthService _authService;

@@ -3,12 +3,11 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy csproj and restore dependencies
-COPY EmailService/EmailService.csproj EmailService/
-RUN dotnet restore "EmailService/EmailService.csproj"
+COPY *.csproj ./
+RUN dotnet restore
 
 # Copy the rest of the application
-COPY EmailService/ EmailService/
-WORKDIR /src/EmailService
+COPY . ./
 RUN dotnet build "EmailService.csproj" -c Release -o /app/build
 
 # Publish the application

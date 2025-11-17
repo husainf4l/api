@@ -1,6 +1,8 @@
 using Amazon.SimpleEmail;
 using Amazon.SimpleEmail.Model;
 using EmailService.DTOs;
+using EmailService.Data;
+using EmailService.Models;
 
 namespace EmailService.Services
 {
@@ -13,17 +15,34 @@ namespace EmailService.Services
     {
         private readonly IAmazonSimpleEmailService _sesClient;
         private readonly ILogger<AwsSesEmailService> _logger;
+        private readonly EmailDbContext _dbContext;
         private readonly string _fromEmail;
 
-        public AwsSesEmailService(IAmazonSimpleEmailService sesClient, ILogger<AwsSesEmailService> logger, IConfiguration configuration)
+        public AwsSesEmailService(
+            IAmazonSimpleEmailService sesClient, 
+            ILogger<AwsSesEmailService> logger, 
+            EmailDbContext dbContext,
+            IConfiguration configuration)
         {
             _sesClient = sesClient;
             _logger = logger;
+            _dbContext = dbContext;
             _fromEmail = configuration["EmailSettings:FromEmail"] ?? "noreply@example.com";
         }
 
         public async Task<EmailResponse> SendEmailAsync(DTOs.SendEmailRequest request)
         {
+            var emailLog = new EmailLog
+            {
+                To = request.To,
+                Cc = request.Cc,
+                Bcc = request.Bcc,
+                Subject = request.Subject,
+                Body = request.Body,
+                IsHtml = request.IsHtml,
+                SentAt = DateTime.UtcNow
+            };
+
             try
             {
                 var sendRequest = new Amazon.SimpleEmail.Model.SendEmailRequest
@@ -60,6 +79,14 @@ namespace EmailService.Services
 
                 _logger.LogInformation($"Email sent successfully to {request.To}. MessageId: {response.MessageId}");
 
+                // Update log with success
+                emailLog.Success = true;
+                emailLog.MessageId = response.MessageId;
+
+                // Save to database
+                _dbContext.EmailLogs.Add(emailLog);
+                await _dbContext.SaveChangesAsync();
+
                 return new EmailResponse
                 {
                     Success = true,
@@ -70,6 +97,15 @@ namespace EmailService.Services
             catch (Exception ex)
             {
                 _logger.LogError($"Error sending email: {ex.Message}");
+
+                // Update log with failure
+                emailLog.Success = false;
+                emailLog.ErrorMessage = ex.Message;
+
+                // Save to database
+                _dbContext.EmailLogs.Add(emailLog);
+                await _dbContext.SaveChangesAsync();
+
                 return new EmailResponse
                 {
                     Success = false,

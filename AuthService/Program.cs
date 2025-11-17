@@ -8,6 +8,10 @@ using Services = AuthService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure logging to reduce noise
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
+builder.Logging.AddFilter("Microsoft.AspNetCore.DataProtection", LogLevel.Warning);
+
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -57,6 +61,13 @@ builder.Services.AddAuthentication(options =>
 
 // Add authorization
 builder.Services.AddAuthorization();
+
+// Configure Data Protection - keys will persist in mounted volume
+var keysDirectory = new DirectoryInfo("/root/.aspnet/DataProtection-Keys");
+if (!keysDirectory.Exists)
+{
+    keysDirectory.Create();
+}
 
 // Configure OAuth providers
 builder.Services.AddAuthentication()
@@ -161,14 +172,20 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Use path base for all routes (adds /auth prefix)
+app.UsePathBase("/auth");
+
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/auth/swagger/v1/swagger.json", "AuthService API V1");
+    });
 }
 
-app.UseHttpsRedirection();
+// HTTPS is handled by reverse proxy (nginx), so we don't need HTTPS redirection
 
 // Enable CORS
 app.UseCors("AllowAll");
@@ -194,21 +211,22 @@ app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthC
     Predicate = (check) => check.Tags.Contains("live")
 });
 
-// Database migration (run on startup in development)
-if (app.Environment.IsDevelopment())
+// Database migration (run on startup)
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
     try
     {
         // Apply any pending migrations
         await dbContext.Database.MigrateAsync();
-        Console.WriteLine("Database migrations applied successfully");
+        logger.LogInformation("Database migrations applied successfully");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Database migration failed: {ex.Message}");
+        logger.LogError(ex, "Database migration failed: {Message}", ex.Message);
+        // Don't throw in production, let the app start and handle it gracefully
     }
 }
 
