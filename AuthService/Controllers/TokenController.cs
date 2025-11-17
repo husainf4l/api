@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AuthService.Controllers;
 
 [ApiController]
-[Route("auth")]
+[Route("api/auth")]
 public class TokenController : ControllerBase
 {
     private readonly AuthDbContext _context;

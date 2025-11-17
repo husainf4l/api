@@ -5,18 +5,24 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "5101:5101"
+    network_mode: "host"
+    volumes:
+      - dataprotection-keys:/root/.aspnet/DataProtection-Keys
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:5101
-      - ConnectionStrings__DefaultConnection=Host=149.200.251.12;Port=5432;Username=husain;Password=tt55oo77;Database=aqlaanauth
+      - ASPNETCORE_HTTP_PORTS=5101
+      - ConnectionStrings__DefaultConnection=Host=localhost;Port=5432;Username=husain;Password=tt55oo77;Database=aqlaanauth
       - Jwt__Key=8a7b9c4d5e6f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d
-      - Jwt__Issuer=https://auth.yourdomain.com
-      - Jwt__Audience=your-microservices
+      - Jwt__Issuer=https://api.aqlaan.com
+      - Jwt__Audience=aqlaan-services
+      - DataProtection__ApplicationName=AqlaanAuthService
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5101/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+
+volumes:
+  dataprotection-keys:
