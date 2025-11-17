@@ -14,9 +14,9 @@ builder.Services.AddGraphQLServer()
     .AddAuthorization()
     .AddHttpRequestInterceptor<GraphQLAuthInterceptor>();
 
-// Configure PostgreSQL Database - commented out for testing
-// builder.Services.AddDbContext<EmailDbContext>(options =>
-//     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+// Configure PostgreSQL Database
+builder.Services.AddDbContext<EmailDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Configure AWS SES
 builder.Services.AddAWSService<IAmazonSimpleEmailService>();
