@@ -8,7 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -18,12 +17,17 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.0" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.0.1" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="9.0.0" />
     <PackageReference Include="Otp.NET" Version="1.4.0" />
     <PackageReference Include="QRCoder" Version="1.7.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="10.0.0" />
+
+    <!-- HotChocolate GraphQL -->
+    <PackageReference Include="HotChocolate.AspNetCore" Version="14.0.0" />
+    <PackageReference Include="HotChocolate.AspNetCore.Authorization" Version="14.0.0" />
+    <PackageReference Include="HotChocolate.Data.EntityFramework" Version="14.0.0" />
+    <PackageReference Include="HotChocolate.Types" Version="14.0.0" />
   </ItemGroup>
 
 </Project>

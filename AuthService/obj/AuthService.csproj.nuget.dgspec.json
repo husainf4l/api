@@ -55,6 +55,22 @@
               "target": "Package",
               "version": "[4.0.3, )"
             },
+            "HotChocolate.AspNetCore": {
+              "target": "Package",
+              "version": "[14.0.0, )"
+            },
+            "HotChocolate.AspNetCore.Authorization": {
+              "target": "Package",
+              "version": "[14.0.0, )"
+            },
+            "HotChocolate.Data.EntityFramework": {
+              "target": "Package",
+              "version": "[14.0.0, )"
+            },
+            "HotChocolate.Types": {
+              "target": "Package",
+              "version": "[14.0.0, )"
+            },
             "Microsoft.AspNetCore.Authentication.Google": {
               "target": "Package",
               "version": "[10.0.0, )"
@@ -64,10 +80,6 @@
               "version": "[10.0.0, )"
             },
             "Microsoft.AspNetCore.Identity.EntityFrameworkCore": {
-              "target": "Package",
-              "version": "[10.0.0, )"
-            },
-            "Microsoft.AspNetCore.OpenApi": {
               "target": "Package",
               "version": "[10.0.0, )"
             },
@@ -87,7 +99,7 @@
             },
             "Npgsql.EntityFrameworkCore.PostgreSQL": {
               "target": "Package",
-              "version": "[9.0.4, )"
+              "version": "[10.0.0-rc.2, )"
             },
             "Otp.NET": {
               "target": "Package",
@@ -96,10 +108,6 @@
             "QRCoder": {
               "target": "Package",
               "version": "[1.7.0, )"
-            },
-            "Swashbuckle.AspNetCore": {
-              "target": "Package",
-              "version": "[10.0.1, )"
             }
           },
           "imports": [

@@ -1,5 +1,7 @@
 using AuthService.Data;
 using AuthService.Services;
+using AuthService.GraphQL;
+using AuthService.GraphQL.DataLoaders;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -13,9 +15,30 @@ builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogL
 builder.Logging.AddFilter("Microsoft.AspNetCore.DataProtection", LogLevel.Warning);
 
 // Add services to the container
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services
+    .AddGraphQLServer()
+    .AddAuthorization()
+    .AddQueryType<Query>()
+    .AddMutationType<Mutation>()
+    .AddType<ApplicationType>()
+    .AddType<UserType>()
+    .AddType<RoleType>()
+    .AddType<ApiKeyType>()
+    .AddType<SessionLogType>()
+    .AddType<ApplicationStatsType>()
+    .AddType<TwoFactorSetupResponseType>()
+    .AddType<CreateApiKeyResponseType>()
+    .AddType<RegisterRequestInput>()
+    .AddType<LoginRequestInput>()
+    .AddType<CreateApplicationRequestInput>()
+    .AddType<CreateApiKeyRequestInput>()
+    .AddType<ValidateApiKeyRequestInput>()
+    .AddType<TokenResponseType>()
+    .AddType<UserInfoType>()
+    .AddType<ValidateApiKeyResponseType>()
+    .AddFiltering()
+    .AddSorting()
+    .AddProjections();
 
 // Configure Entity Framework with PostgreSQL
 builder.Services.AddDbContext<AuthDbContext>(options =>
@@ -153,6 +176,11 @@ builder.Services.AddScoped<IExternalLoginService, ExternalLoginService>();
 // Add HttpClient for email service
 builder.Services.AddHttpClient();
 
+// Register data loaders for GraphQL
+builder.Services.AddScoped<ApplicationDataLoader>();
+builder.Services.AddScoped<UserDataLoader>();
+builder.Services.AddScoped<UserRolesDataLoader>();
+
 // Register email service (use console service in development, real service in production)
 if (builder.Environment.IsDevelopment())
 {
@@ -185,11 +213,8 @@ app.UsePathBase("/auth");
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/auth/swagger/v1/swagger.json", "AuthService API V1");
-    });
+    // Enable GraphQL Playground for development
+    app.UseGraphQLPlayground("/graphql");
 }
 
 // HTTPS is handled by reverse proxy (nginx), so we don't need HTTPS redirection
@@ -201,8 +226,8 @@ app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Map controllers
-app.MapControllers();
+// Map GraphQL endpoint
+app.MapGraphQL();
 
 // Map Razor Pages (for dashboard)
 app.MapRazorPages();
