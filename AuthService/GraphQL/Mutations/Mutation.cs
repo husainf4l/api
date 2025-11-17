@@ -414,13 +414,77 @@ public class Mutation
         return true;
     }
 
-    // Password reset functionality - to be implemented
-    // [Authorize]
-    // public async Task<bool> ForgotPassword(...) { ... }
+    // Password reset functionality
+    public async Task<bool> ForgotPassword(
+        string email,
+        string applicationCode,
+        [Service] AuthService.Services.AuthService authService,
+        [Service] ApplicationService applicationService)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            throw new GraphQLException("Email is required");
 
-    // Email verification functionality - to be implemented
-    // [Authorize]
-    // public async Task<bool> VerifyEmail(...) { ... }
+        if (string.IsNullOrWhiteSpace(applicationCode))
+            throw new GraphQLException("Application code is required");
+
+        // Get application by code
+        var application = await applicationService.GetApplicationByCodeAsync(applicationCode);
+        if (application == null)
+            throw new GraphQLException("Invalid application code");
+
+        await authService.RequestPasswordResetAsync(email, application.Id);
+        return true;
+    }
+
+    public async Task<bool> ResetPassword(
+        string email,
+        string token,
+        string newPassword,
+        string confirmPassword,
+        [Service] AuthService.Services.AuthService authService)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            throw new GraphQLException("Email is required");
+
+        if (string.IsNullOrWhiteSpace(token))
+            throw new GraphQLException("Token is required");
+
+        if (string.IsNullOrWhiteSpace(newPassword))
+            throw new GraphQLException("New password is required");
+
+        if (newPassword.Length < 8)
+            throw new GraphQLException("Password must be at least 8 characters long");
+
+        if (newPassword != confirmPassword)
+            throw new GraphQLException("Password confirmation does not match");
+
+        var result = await authService.ResetPasswordAsync(email, token, newPassword);
+        
+        if (!result)
+            throw new GraphQLException("Invalid or expired reset token");
+
+        return true;
+    }
+
+    // Email verification functionality
+    public async Task<bool> VerifyEmail(
+        string email,
+        string token,
+        [Service] AuthService.Services.AuthService authService)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            throw new GraphQLException("Email is required");
+
+        if (string.IsNullOrWhiteSpace(token))
+            throw new GraphQLException("Token is required");
+
+        var result = await authService.VerifyEmailAsync(email, token);
+        
+        if (!result)
+            throw new GraphQLException("Invalid or expired verification token");
+
+        return true;
+    }
 }
 
 // Response DTOs for mutations

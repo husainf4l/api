@@ -177,15 +177,8 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped<ApplicationDataLoader>();
 builder.Services.AddScoped<UserDataLoader>();
 
-// Register email service (use console service in development, real service in production)
-if (builder.Environment.IsDevelopment())
-{
-    builder.Services.AddScoped<IEmailService, ConsoleEmailService>();
-}
-else
-{
-    builder.Services.AddScoped<IEmailService, EmailService>();
-}
+// Register email service - use real GraphQL email service for testing
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 // Add Razor Pages for dashboard (if needed)
 builder.Services.AddRazorPages();

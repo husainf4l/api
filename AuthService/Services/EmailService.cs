@@ -29,32 +29,67 @@ public class EmailService : IEmailService
     {
         try
         {
-            var emailServiceUrl = _configuration["EmailService:Url"] ?? "https://api.aqlaan.com/email/send";
+            var emailServiceUrl = _configuration["EmailService:Url"] ?? "https://api.aqlaan.com/email/graphql";
             
-            var emailRequest = new
+            // GraphQL mutation for sending email
+            var graphqlRequest = new
             {
-                to = toEmail,
-                subject = subject,
-                body = body,
-                isHtml = true
+                query = @"mutation SendEmail($input: SendEmailInput!) {
+                    sendEmail(input: $input) {
+                        success
+                        message
+                        messageId
+                    }
+                }",
+                variables = new
+                {
+                    input = new
+                    {
+                        to = toEmail,
+                        subject = subject,
+                        body = body,
+                        isHtml = true
+                    }
+                }
             };
 
-            var jsonContent = JsonSerializer.Serialize(emailRequest);
+            var jsonContent = JsonSerializer.Serialize(graphqlRequest);
             var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-            _logger.LogInformation("Sending email to {Email} via {Url}", toEmail, emailServiceUrl);
+            _logger.LogInformation("Sending email to {Email} via GraphQL endpoint {Url}", toEmail, emailServiceUrl);
 
             var response = await _httpClient.PostAsync(emailServiceUrl, httpContent);
+            var responseContent = await response.Content.ReadAsStringAsync();
 
             if (response.IsSuccessStatusCode)
             {
-                _logger.LogInformation("Email sent successfully to {Email}", toEmail);
+                var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                
+                if (result.TryGetProperty("data", out var data) && 
+                    data.TryGetProperty("sendEmail", out var sendEmail))
+                {
+                    var success = sendEmail.GetProperty("success").GetBoolean();
+                    var message = sendEmail.GetProperty("message").GetString();
+                    var messageId = sendEmail.TryGetProperty("messageId", out var msgId) ? msgId.GetString() : null;
+                    
+                    if (success)
+                    {
+                        _logger.LogInformation("Email sent successfully to {Email}. MessageId: {MessageId}", toEmail, messageId);
+                    }
+                    else
+                    {
+                        _logger.LogError("Failed to send email to {Email}. Message: {Message}", toEmail, message);
+                    }
+                }
+                else if (result.TryGetProperty("errors", out var errors))
+                {
+                    _logger.LogError("GraphQL errors when sending email to {Email}: {Errors}", toEmail, errors.ToString());
+                }
             }
             else
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError("Failed to send email to {Email}. Status: {Status}, Error: {Error}", 
-                    toEmail, response.StatusCode, errorContent);
+                _logger.LogError("Failed to send email to {Email}. Status: {Status}, Response: {Response}", 
+                    toEmail, response.StatusCode, responseContent);
             }
         }
         catch (Exception ex)
