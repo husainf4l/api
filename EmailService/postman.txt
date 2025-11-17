@@ -1,0 +1,68 @@
+# 1. Health Check
+curl --location 'https://api.aqlaan.com/email/health'
+
+# 2. Send Plain Text Email
+curl --location 'https://api.aqlaan.com/email/send' \
+--header 'Content-Type: application/json' \
+--header 'X-API-Key: dev-email-service-key-2024' \
+--data-raw '{
+    "to": "recipient@example.com",
+    "subject": "Test Email",
+    "body": "This is a plain text email.",
+    "isHtml": false
+}'
+
+# 3. Send HTML Email
+curl --location 'https://api.aqlaan.com/email/send' \
+--header 'Content-Type: application/json' \
+--header 'X-API-Key: dev-email-service-key-2024' \
+--data-raw '{
+    "to": "recipient@example.com",
+    "subject": "HTML Email Test",
+    "body": "<h1>Hello!</h1><p>This is an <strong>HTML</strong> email.</p>",
+    "isHtml": true
+}'
+
+# 4. Generate HTML Template
+curl --location 'https://api.aqlaan.com/email/generate-html' \
+--header 'Content-Type: application/json' \
+--header 'X-API-Key: dev-email-service-key-2024' \
+--data '{
+    "title": "Welcome Email",
+    "heading": "Welcome Aboard!",
+    "message": "Thank you for joining our platform. We are excited to have you with us.",
+    "buttonText": "Get Started",
+    "buttonUrl": "https://aqlaan.com/dashboard",
+    "additionalInfo": "If you have any questions, contact our support team.",
+    "footerText": "Your Company Name"
+}'
+
+# 5. Generate HTML Template + Send Email (Two-step process)
+# Step 1: Generate HTML
+curl --location 'https://api.aqlaan.com/email/generate-html' \
+--header 'Content-Type: application/json' \
+--header 'X-API-Key: dev-email-service-key-2024' \
+--data '{
+    "title": "Password Reset",
+    "heading": "Reset Your Password",
+    "message": "We received a request to reset your password. Click the button below to proceed.",
+    "buttonText": "Reset Password",
+    "buttonUrl": "https://aqlaan.com/reset",
+    "additionalInfo": "This link expires in 1 hour.",
+    "footerText": "Security Team"
+}'
+
+# Step 2: Copy the "html" from response and use in send email with isHtml: true
+
+# 6. Send Email with CC and BCC
+curl --location 'https://api.aqlaan.com/email/send' \
+--header 'Content-Type: application/json' \
+--header 'X-API-Key: dev-email-service-key-2024' \
+--data-raw '{
+    "to": "recipient@example.com",
+    "cc": "cc@example.com",
+    "bcc": "bcc@example.com",
+    "subject": "Email with CC and BCC",
+    "body": "This email has CC and BCC recipients.",
+    "isHtml": false
+}'

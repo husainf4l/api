@@ -5,9 +5,9 @@ services:
     image: postgres:17
     container_name: emailservice-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: emailservice
+      POSTGRES_USER: husain
+      POSTGRES_PASSWORD: tt55oo77
+      POSTGRES_DB: aqlaanemail
     ports:
       - "5433:5432"
     volumes:
@@ -16,15 +16,15 @@ services:
     networks:
       - emailservice-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U husain"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   emailservice:
     build:
-      context: ..
-      dockerfile: EmailService/Dockerfile
+      context: .
+      dockerfile: Dockerfile
     container_name: emailservice
     ports:
       - "5102:5189"
@@ -34,7 +34,7 @@ services:
       - AWS_SECRET_ACCESS_KEY=evBK9EWyJeQxdnTbRMeaPUjGKtONInvC3tNcPdlV
       - AWS_REGION=me-central-1
       - ApiSettings__ApiKey=dev-email-service-key-2024
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=emailservice;Username=postgres;Password=postgres
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=aqlaanemail;Username=husain;Password=tt55oo77
     depends_on:
       postgres:
         condition: service_healthy
