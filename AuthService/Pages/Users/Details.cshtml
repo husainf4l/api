@@ -1,0 +1,423 @@
+@page
+@model AuthService.Pages.Users.DetailsModel
+@{
+    ViewData["Title"] = $"User: {Model.User?.Email ?? "Not Found"}";
+    Layout = "_Layout";
+}
+
+@if (Model.User == null)
+{
+    <div class="alert alert-danger">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        User not found.
+        <a href="/Users" class="alert-link">Back to Users</a>
+    </div>
+    return;
+}
+
+<!-- Success/Error Messages -->
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>@Model.SuccessMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i>@Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+        <li class="breadcrumb-item">
+            <a href="/Users@(Model.App != null ? $"?app={Model.App}" : "")">Users</a>
+        </li>
+        <li class="breadcrumb-item active">@Model.User.Email</li>
+    </ol>
+</nav>
+
+<!-- User Header -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="avatar-circle bg-primary text-white me-3">
+                        <i class="fas fa-user fa-lg"></i>
+                    </div>
+                    <div>
+                        <h2 class="card-title mb-1">@Model.User.Email</h2>
+                        @if (Model.Application != null)
+                        {
+                            <p class="text-muted mb-1">
+                                <i class="fas fa-building me-1"></i>@Model.Application.Name
+                                <code class="ms-2">@Model.Application.Code</code>
+                            </p>
+                        }
+                        <div>
+                            @if (Model.User.IsActive)
+                            {
+                                <span class="badge bg-success me-2">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary me-2">Inactive</span>
+                            }
+                            @if (Model.User.IsEmailVerified)
+                            {
+                                <span class="badge bg-info me-2">
+                                    <i class="fas fa-check me-1"></i>Email Verified
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-warning me-2">
+                                    <i class="fas fa-clock me-1"></i>Email Pending
+                                </span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="btn-group" role="group">
+                    <form method="post" asp-page-handler="ToggleStatus" class="d-inline">
+                        <button type="submit" class="btn @(Model.User.IsActive ? "btn-outline-warning" : "btn-outline-success")"
+                                onclick="return confirm('Are you sure you want to @(Model.User.IsActive ? "deactivate" : "activate") this user?')">
+                            <i class="fas fa-@(Model.User.IsActive ? "pause" : "play") me-1"></i>
+                            @(Model.User.IsActive ? "Deactivate" : "Activate")
+                        </button>
+                    </form>
+                    <form method="post" asp-page-handler="Delete" class="d-inline ms-2">
+                        <button type="submit" class="btn btn-outline-danger"
+                                onclick="return confirm('Are you sure you want to delete this user? This action cannot be undone.')">
+                            <i class="fas fa-trash me-1"></i>Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <div class="display-6 text-primary">@Model.User.Roles.Count</div>
+                <p class="text-muted mb-0">Assigned Roles</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <div class="display-6 text-success">
+                    @if (Model.User.LastLoginAt.HasValue)
+                    {
+                        @Model.User.LastLoginAt.Value.ToString("MMM dd")
+                    }
+                    else
+                    {
+                        <span class="text-muted">—</span>
+                    }
+                </div>
+                <p class="text-muted mb-0">Last Login</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <div class="display-6 text-info">@Model.User.CreatedAt.ToString("MMM dd")</div>
+                <p class="text-muted mb-0">Member Since</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <div class="display-6 text-warning">0</div>
+                <p class="text-muted mb-0">API Keys</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs Navigation -->
+<ul class="nav nav-tabs" id="userTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link @(Model.ActiveTab == "profile" ? "active" : "")"
+                id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile"
+                type="button" role="tab" aria-controls="profile" aria-selected="@(Model.ActiveTab == "profile")">
+            <i class="fas fa-user me-1"></i>Profile
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link @(Model.ActiveTab == "roles" ? "active" : "")"
+                id="roles-tab" data-bs-toggle="tab" data-bs-target="#roles"
+                type="button" role="tab" aria-controls="roles" aria-selected="@(Model.ActiveTab == "roles")">
+            <i class="fas fa-user-tag me-1"></i>Roles (@Model.User.Roles.Count)
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link @(Model.ActiveTab == "sessions" ? "active" : "")"
+                id="sessions-tab" data-bs-toggle="tab" data-bs-target="#sessions"
+                type="button" role="tab" aria-controls="sessions" aria-selected="@(Model.ActiveTab == "sessions")">
+            <i class="fas fa-history me-1"></i>Sessions
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link @(Model.ActiveTab == "activity" ? "active" : "")"
+                id="activity-tab" data-bs-toggle="tab" data-bs-target="#activity"
+                type="button" role="tab" aria-controls="activity" aria-selected="@(Model.ActiveTab == "activity")">
+            <i class="fas fa-chart-line me-1"></i>Activity
+        </button>
+    </li>
+</ul>
+
+<!-- Tab Content -->
+<div class="tab-content mt-4" id="userTabsContent">
+    <!-- Profile Tab -->
+    <div class="tab-pane fade @(Model.ActiveTab == "profile" ? "show active" : "")"
+         id="profile" role="tabpanel" aria-labelledby="profile-tab">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-edit me-2"></i>Edit Profile
+                    </div>
+                    <div class="card-body">
+                        <form method="post" asp-page-handler="UpdateProfile">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="UpdateRequest_Email" class="form-label">Email Address</label>
+                                    <input type="email" class="form-control" id="UpdateRequest_Email"
+                                           asp-for="UpdateRequest.Email" value="@Model.User.Email">
+                                    <div class="form-text">Leave empty to keep current email</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="UpdateRequest_PhoneNumber" class="form-label">Phone Number</label>
+                                    <input type="tel" class="form-control" id="UpdateRequest_PhoneNumber"
+                                           asp-for="UpdateRequest.PhoneNumber" value="@Model.User.PhoneNumber">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="UpdateRequest_IsEmailVerified"
+                                               asp-for="UpdateRequest.IsEmailVerified">
+                                        <label class="form-check-label" for="UpdateRequest_IsEmailVerified">
+                                            Email Verified
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="UpdateRequest_IsActive"
+                                               asp-for="UpdateRequest.IsActive" checked="@Model.User.IsActive">
+                                        <label class="form-check-label" for="UpdateRequest_IsActive">
+                                            Account Active
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>Update Profile
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-info-circle me-2"></i>User Information
+                    </div>
+                    <div class="card-body">
+                        <dl class="row small">
+                            <dt class="col-sm-5">User ID</dt>
+                            <dd class="col-sm-7"><code class="small">@Model.User.Id.ToString().Substring(0, 8)</code></dd>
+
+                            <dt class="col-sm-5">Created</dt>
+                            <dd class="col-sm-7">@Model.User.CreatedAt.ToString("MMM dd, yyyy")</dd>
+
+                            <dt class="col-sm-5">Last Login</dt>
+                            <dd class="col-sm-7">
+                                @if (Model.User.LastLoginAt.HasValue)
+                                {
+                                    @Model.User.LastLoginAt.Value.ToString("MMM dd, yyyy HH:mm")
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Never</span>
+                                }
+                            </dd>
+
+                            <dt class="col-sm-5">Status</dt>
+                            <dd class="col-sm-7">
+                                @if (Model.User.IsActive)
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Inactive</span>
+                                }
+                            </dd>
+
+                            <dt class="col-sm-5">2FA</dt>
+                            <dd class="col-sm-7">
+                                @if (Model.User.TwoFactorEnabled)
+                                {
+                                    <span class="badge bg-success">Enabled</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Disabled</span>
+                                }
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Roles Tab -->
+    <div class="tab-pane fade @(Model.ActiveTab == "roles" ? "show active" : "")"
+         id="roles" role="tabpanel" aria-labelledby="roles-tab">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-user-tag me-2"></i>Assigned Roles
+                    </div>
+                    <div class="card-body">
+                        @if (Model.UserRoles.Any())
+                        {
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var role in Model.UserRoles)
+                                {
+                                    <div class="d-flex align-items-center bg-light rounded px-2 py-1">
+                                        <span class="me-2">@role</span>
+                                        <form method="post" asp-page-handler="RemoveRole" class="d-inline">
+                                            <input type="hidden" name="roleName" value="@role" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger border-0 p-0"
+                                                    onclick="return confirm('Remove role \'@role\' from this user?')">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-muted mb-0">No roles assigned to this user.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-plus me-2"></i>Assign New Role
+                    </div>
+                    <div class="card-body">
+                        @if (Model.AvailableRoles.Any())
+                        {
+                            <form method="post" asp-page-handler="AssignRole" class="mb-3">
+                                <div class="input-group">
+                                    <select class="form-select" name="roleName" required>
+                                        <option value="">Select a role...</option>
+                                        @foreach (var role in Model.AvailableRoles)
+                                        {
+                                            <option value="@role">@role</option>
+                                        }
+                                    </select>
+                                    <button class="btn btn-primary" type="submit">
+                                        <i class="fas fa-plus me-1"></i>Assign
+                                    </button>
+                                </div>
+                            </form>
+                        }
+                        else
+                        {
+                            <p class="text-muted mb-0">All available roles are already assigned to this user.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sessions Tab -->
+    <div class="tab-pane fade @(Model.ActiveTab == "sessions" ? "show active" : "")"
+         id="sessions" role="tabpanel" aria-labelledby="sessions-tab">
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Coming Soon:</strong> Session tracking will be available in Phase 4.
+            This tab will show login/logout history for this user.
+        </div>
+
+        <div class="text-center py-5">
+            <i class="fas fa-history fa-4x text-muted mb-3"></i>
+            <h4 class="text-muted">Session History</h4>
+            <p class="text-muted">Session tracking functionality will be implemented in Phase 4.</p>
+        </div>
+    </div>
+
+    <!-- Activity Tab -->
+    <div class="tab-pane fade @(Model.ActiveTab == "activity" ? "show active" : "")"
+         id="activity" role="tabpanel" aria-labelledby="activity-tab">
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Coming Soon:</strong> Activity monitoring will be available in Phase 4.
+            This tab will show user activity and API usage statistics.
+        </div>
+
+        <div class="text-center py-5">
+            <i class="fas fa-chart-line fa-4x text-muted mb-3"></i>
+            <h4 class="text-muted">User Activity</h4>
+            <p class="text-muted">Activity monitoring will be implemented in Phase 4.</p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .avatar-circle {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+</style>
+
+@section Scripts {
+    <script>
+        // Auto-hide alerts after 5 seconds
+        setTimeout(function() {
+            $('.alert').fadeOut('slow');
+        }, 5000);
+
+        // Handle tab switching with URL updates
+        $('#userTabs .nav-link').on('shown.bs.tab', function (e) {
+            var target = $(e.target).attr('data-bs-target').substring(1); // Remove #
+            var url = new URL(window.location);
+            url.searchParams.set('tab', target);
+            window.history.pushState({}, '', url);
+        });
+    </script>
+}

@@ -1,0 +1,435 @@
+@page
+@model AuthService.Pages.Applications.DetailsModel
+@{
+    ViewData["Title"] = $"Application: {Model.Application?.Name ?? "Not Found"}";
+    Layout = "_Layout";
+}
+
+@if (Model.Application == null)
+{
+    <div class="alert alert-danger">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        Application not found.
+        <a href="/Applications" class="alert-link">Back to Applications</a>
+    </div>
+    return;
+}
+
+<!-- Success/Error Messages -->
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>@Model.SuccessMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i>@Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/Dashboard">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="/Applications">Applications</a></li>
+        <li class="breadcrumb-item active">@Model.Application.Name</li>
+    </ol>
+</nav>
+
+<!-- Application Header -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h2 class="card-title mb-2">
+                    <i class="fas fa-building text-primary me-2"></i>
+                    @Model.Application.Name
+                    @if (Model.Application.IsActive)
+                    {
+                        <span class="badge bg-success ms-2">Active</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary ms-2">Inactive</span>
+                    }
+                </h2>
+                <p class="text-muted mb-2">
+                    <strong>Code:</strong> <code>@Model.Application.Code</code>
+                </p>
+                <p class="text-muted mb-0">
+                    <strong>Created:</strong> @Model.Application.CreatedAt.ToString("MMM dd, yyyy 'at' HH:mm")
+                </p>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="btn-group" role="group">
+                    <form method="post" asp-page-handler="ToggleStatus" class="d-inline">
+                        <button type="submit" class="btn @(Model.Application.IsActive ? "btn-outline-warning" : "btn-outline-success")"
+                                onclick="return confirm('Are you sure you want to @(Model.Application.IsActive ? "deactivate" : "activate") this application?')">
+                            <i class="fas fa-@(Model.Application.IsActive ? "pause" : "play") me-1"></i>
+                            @(Model.Application.IsActive ? "Deactivate" : "Activate")
+                        </button>
+                    </form>
+                    <form method="post" asp-page-handler="Delete" class="d-inline ms-2">
+                        <button type="submit" class="btn btn-outline-danger"
+                                onclick="return confirm('Are you sure you want to delete this application? This action cannot be undone.')">
+                            <i class="fas fa-trash me-1"></i>Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <div class="display-6 text-primary">@Model.Application.UserCount</div>
+                <p class="text-muted mb-0">Total Users</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <div class="display-6 text-success">@Model.Application.ActiveApiKeyCount</div>
+                <p class="text-muted mb-0">Active API Keys</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <div class="display-6 text-info">@Model.Application.ApiKeyCount</div>
+                <p class="text-muted mb-0">Total API Keys</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <div class="display-6 text-warning">
+                    @if (Model.Application.LastActivity.HasValue)
+                    {
+                        @Model.Application.LastActivity.Value.ToString("MMM dd")
+                    }
+                    else
+                    {
+                        <span class="text-muted">—</span>
+                    }
+                </div>
+                <p class="text-muted mb-0">Last Activity</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs Navigation -->
+<ul class="nav nav-tabs" id="applicationTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link @(Model.ActiveTab == "overview" ? "active" : "")"
+                id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview"
+                type="button" role="tab" aria-controls="overview" aria-selected="@(Model.ActiveTab == "overview")">
+            <i class="fas fa-chart-line me-1"></i>Overview
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link @(Model.ActiveTab == "users" ? "active" : "")"
+                id="users-tab" data-bs-toggle="tab" data-bs-target="#users"
+                type="button" role="tab" aria-controls="users" aria-selected="@(Model.ActiveTab == "users")">
+            <i class="fas fa-users me-1"></i>Users (@Model.Application.UserCount)
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link @(Model.ActiveTab == "api-keys" ? "active" : "")"
+                id="api-keys-tab" data-bs-toggle="tab" data-bs-target="#api-keys"
+                type="button" role="tab" aria-controls="api-keys" aria-selected="@(Model.ActiveTab == "api-keys")">
+            <i class="fas fa-key me-1"></i>API Keys (@Model.Application.ApiKeyCount)
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link @(Model.ActiveTab == "settings" ? "active" : "")"
+                id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings"
+                type="button" role="tab" aria-controls="settings" aria-selected="@(Model.ActiveTab == "settings")">
+            <i class="fas fa-cogs me-1"></i>Settings
+        </button>
+    </li>
+</ul>
+
+<!-- Tab Content -->
+<div class="tab-content mt-4" id="applicationTabsContent">
+    <!-- Overview Tab -->
+    <div class="tab-pane fade @(Model.ActiveTab == "overview" ? "show active" : "")"
+         id="overview" role="tabpanel" aria-labelledby="overview-tab">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-info-circle me-2"></i>Application Information
+                    </div>
+                    <div class="card-body">
+                        <dl class="row">
+                            <dt class="col-sm-4">Name</dt>
+                            <dd class="col-sm-8">@Model.Application.Name</dd>
+
+                            <dt class="col-sm-4">Code</dt>
+                            <dd class="col-sm-8"><code>@Model.Application.Code</code></dd>
+
+                            <dt class="col-sm-4">Status</dt>
+                            <dd class="col-sm-8">
+                                @if (Model.Application.IsActive)
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Inactive</span>
+                                }
+                            </dd>
+
+                            <dt class="col-sm-4">Created</dt>
+                            <dd class="col-sm-8">@Model.Application.CreatedAt.ToString("MMMM dd, yyyy 'at' HH:mm")</dd>
+
+                            <dt class="col-sm-4">Client ID</dt>
+                            <dd class="col-sm-8">
+                                <code>app_************</code>
+                                <small class="text-muted d-block">Hidden for security</small>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-chart-bar me-2"></i>Quick Actions
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="?tab=users" class="btn btn-outline-primary">
+                                <i class="fas fa-users me-2"></i>Manage Users
+                            </a>
+                            <a href="?tab=api-keys" class="btn btn-outline-success">
+                                <i class="fas fa-key me-2"></i>Manage API Keys
+                            </a>
+                            <a href="?tab=settings" class="btn btn-outline-info">
+                                <i class="fas fa-cogs me-2"></i>Configure Settings
+                            </a>
+                            <a href="/Users?app=@Model.Application.Code" class="btn btn-outline-secondary">
+                                <i class="fas fa-external-link-alt me-2"></i>View in Users List
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Tab -->
+    <div class="tab-pane fade @(Model.ActiveTab == "users" ? "show active" : "")"
+         id="users" role="tabpanel" aria-labelledby="users-tab">
+        @if (Model.Users.Any())
+        {
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Users in @Model.Application.Name</h5>
+                    <a href="/Users?app=@Model.Application.Code" class="btn btn-primary btn-sm">
+                        <i class="fas fa-external-link-alt me-1"></i>View All Users
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Roles</th>
+                                    <th>Status</th>
+                                    <th>Last Login</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var user in Model.Users.Take(10))
+                                {
+                                    <tr>
+                                        <td>
+                                            <strong>@user.Email</strong>
+                                        </td>
+                                        <td>
+                                            @if (user.Roles.Any())
+                                            {
+                                                @foreach (var role in user.Roles)
+                                                {
+                                                    <span class="badge bg-secondary me-1">@role</span>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">No roles</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (user.IsActive)
+                                            {
+                                                <span class="badge bg-success">Active</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Inactive</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (user.LastLoginAt.HasValue)
+                                            {
+                                                <small class="text-muted">@user.LastLoginAt.Value.ToString("MMM dd, yyyy")</small>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">Never</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <a href="/Users/Details?id=@user.Id&app=@Model.Application.Code" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    @if (Model.Users.Count >= 10)
+                    {
+                        <div class="text-center mt-3">
+                            <a href="/Users?app=@Model.Application.Code" class="btn btn-outline-primary">
+                                View All @Model.Application.UserCount Users
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5">
+                <i class="fas fa-users fa-4x text-muted mb-3"></i>
+                <h4 class="text-muted">No Users Yet</h4>
+                <p class="text-muted">This application doesn't have any users yet.</p>
+                <a href="/Users/Details?app=@Model.Application.Code" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Create First User
+                </a>
+            </div>
+        }
+    </div>
+
+    <!-- API Keys Tab -->
+    <div class="tab-pane fade @(Model.ActiveTab == "api-keys" ? "show active" : "")"
+         id="api-keys" role="tabpanel" aria-labelledby="api-keys-tab">
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Coming Soon:</strong> API key management will be available in Phase 3.
+            This tab will show API keys associated with this application.
+        </div>
+
+        <div class="text-center py-5">
+            <i class="fas fa-key fa-4x text-muted mb-3"></i>
+            <h4 class="text-muted">API Key Management</h4>
+            <p class="text-muted">API key functionality will be implemented in the next phase.</p>
+        </div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div class="tab-pane fade @(Model.ActiveTab == "settings" ? "show active" : "")"
+         id="settings" role="tabpanel" aria-labelledby="settings-tab">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-lock me-2"></i>Client Credentials
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">
+                            These credentials are used for OAuth2 client authentication.
+                        </p>
+                        <dl class="row">
+                            <dt class="col-sm-4">Client ID</dt>
+                            <dd class="col-sm-8">
+                                <code>app_************</code>
+                                <button class="btn btn-sm btn-outline-secondary ms-2" disabled>
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </dd>
+
+                            <dt class="col-sm-4">Client Secret</dt>
+                            <dd class="col-sm-8">
+                                <code>************</code>
+                                <form method="post" asp-page-handler="RegenerateSecret" class="d-inline ms-2">
+                                    <button type="submit" class="btn btn-sm btn-outline-warning"
+                                            onclick="return confirm('Are you sure you want to regenerate the client secret? This will break existing integrations.')">
+                                        <i class="fas fa-refresh me-1"></i>Regenerate
+                                    </button>
+                                </form>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-shield-alt me-2"></i>Security Settings
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Coming Soon:</strong> Advanced security settings will be available in Phase 4.
+                        </div>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                JWT Token Validation
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-clock text-muted me-2"></i>
+                                Password Policies (Coming Soon)
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-envelope text-muted me-2"></i>
+                                Email Verification (Coming Soon)
+                            </li>
+                            <li class="mb-0">
+                                <i class="fas fa-mobile-alt text-muted me-2"></i>
+                                Two-Factor Authentication (Coming Soon)
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Auto-hide alerts after 5 seconds
+        setTimeout(function() {
+            $('.alert').fadeOut('slow');
+        }, 5000);
+
+        // Handle tab switching with URL updates
+        $('#applicationTabs .nav-link').on('shown.bs.tab', function (e) {
+            var target = $(e.target).attr('data-bs-target').substring(1); // Remove #
+            var url = new URL(window.location);
+            url.searchParams.set('tab', target);
+            window.history.pushState({}, '', url);
+        });
+    </script>
+}

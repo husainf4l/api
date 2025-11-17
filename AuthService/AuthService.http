@@ -1,82 +1,358 @@
-@AuthService_HostAddress = http://localhost:5067
+@AuthService_HostAddress = http://localhost:5209
 
-### Health Check
+###
+# Health Check Endpoints
+###
+
 GET {{AuthService_HostAddress}}/health
 Accept: application/json
 
-###############################################
-# Application Management
-###############################################
+###
 
-### Register Email Service Application
-POST {{AuthService_HostAddress}}/api/applications/register
-Content-Type: application/json
-
-{
-  "name": "Email Service",
-  "clientId": "email-service-client",
-  "clientSecret": "email-service-secret-123",
-  "description": "Main email marketing and campaign service",
-  "allowedOrigins": ["http://localhost:3000", "http://localhost:5173"],
-  "allowedScopes": ["email:send", "email:read", "campaigns:manage"]
-}
-
-### Get All Applications
-GET {{AuthService_HostAddress}}/api/applications
+GET {{AuthService_HostAddress}}/health/live
 Accept: application/json
 
-###############################################
-# Authentication (with Application Context)
-###############################################
+###
 
-### Register a new user (with clientId)
-POST {{AuthService_HostAddress}}/api/auth/register
+GET {{AuthService_HostAddress}}/health/ready
+Accept: application/json
+
+###
+# Authentication Endpoints
+###
+
+# Register a new user
+POST {{AuthService_HostAddress}}/auth/register
 Content-Type: application/json
 
 {
   "email": "test@example.com",
-  "password": "Test123!@#",
-  "firstName": "Test",
-  "lastName": "User",
-  "clientId": "email-service-client"
+  "password": "TestPassword123!",
+  "confirmPassword": "TestPassword123!",
+  "applicationCode": "testapp",
+  "phoneNumber": "+1234567890"
 }
 
-### Login (with clientId to track application)
-POST {{AuthService_HostAddress}}/api/auth/login
+###
+
+# Login with registered user
+POST {{AuthService_HostAddress}}/auth/login
 Content-Type: application/json
 
 {
   "email": "test@example.com",
-  "password": "Test123!@#",
-  "clientId": "email-service-client"
+  "password": "TestPassword123!",
+  "applicationCode": "testapp",
+  "deviceInfo": "REST Client Test",
+  "ipAddress": "127.0.0.1",
+  "userAgent": "REST Client"
 }
 
-### Refresh Token
-POST {{AuthService_HostAddress}}/api/auth/refresh
+###
+
+# Get current user info (requires Authorization header)
+GET {{AuthService_HostAddress}}/auth/me
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Accept: application/json
+
+###
+
+# Refresh access token
+POST {{AuthService_HostAddress}}/auth/refresh
 Content-Type: application/json
 
 {
   "refreshToken": "YOUR_REFRESH_TOKEN_HERE"
 }
 
-### Validate Token
-POST {{AuthService_HostAddress}}/api/auth/validate
-Content-Type: application/json
+###
 
-{
-  "accessToken": "YOUR_ACCESS_TOKEN_HERE"
-}
-
-### Revoke Token (Logout)
-POST {{AuthService_HostAddress}}/api/auth/revoke
+# Logout user
+POST {{AuthService_HostAddress}}/auth/logout
 Content-Type: application/json
 
 {
   "refreshToken": "YOUR_REFRESH_TOKEN_HERE"
 }
 
-### Get Current User (requires Authorization header)
-GET {{AuthService_HostAddress}}/api/auth/me
+###
+# Application Management (Admin)
+###
+
+# Get all applications
+GET {{AuthService_HostAddress}}/admin/apps
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Accept: application/json
+
+###
+
+# Get specific application
+GET {{AuthService_HostAddress}}/admin/apps/YOUR_APP_ID_HERE
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Accept: application/json
+
+###
+
+# Create new application
+POST {{AuthService_HostAddress}}/admin/apps
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "name": "Test Application",
+  "code": "testapp",
+  "description": "A test application for development"
+}
+
+###
+
+# Update application
+PUT {{AuthService_HostAddress}}/admin/apps/YOUR_APP_ID_HERE
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "name": "Updated Test Application",
+  "description": "Updated description",
+  "isActive": true
+}
+
+###
+
+# Get application statistics
+GET {{AuthService_HostAddress}}/admin/apps/YOUR_APP_ID_HERE/stats
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Accept: application/json
+
+###
+
+# Delete application
+DELETE {{AuthService_HostAddress}}/admin/apps/YOUR_APP_ID_HERE
 Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
 
 ###
+# User Management (Admin)
+###
+
+# Get users for application
+GET {{AuthService_HostAddress}}/admin/testapp/users?page=1&pageSize=10
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Accept: application/json
+
+###
+
+# Search users
+GET {{AuthService_HostAddress}}/admin/testapp/users?page=1&pageSize=10&search=test
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Accept: application/json
+
+###
+
+# Get specific user
+GET {{AuthService_HostAddress}}/admin/testapp/users/YOUR_USER_ID_HERE
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Accept: application/json
+
+###
+
+# Update user
+PUT {{AuthService_HostAddress}}/admin/testapp/users/YOUR_USER_ID_HERE
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "email": "updated@example.com",
+  "phoneNumber": "+1987654321",
+  "isEmailVerified": true,
+  "isActive": true
+}
+
+###
+
+# Assign role to user
+POST {{AuthService_HostAddress}}/admin/testapp/users/YOUR_USER_ID_HERE/roles
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "roleName": "admin"
+}
+
+###
+
+# Remove role from user
+DELETE {{AuthService_HostAddress}}/admin/testapp/users/YOUR_USER_ID_HERE/roles/admin
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+
+###
+
+# Get user roles
+GET {{AuthService_HostAddress}}/admin/testapp/users/YOUR_USER_ID_HERE/roles
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Accept: application/json
+
+###
+
+# Get user sessions
+GET {{AuthService_HostAddress}}/admin/testapp/users/YOUR_USER_ID_HERE/sessions?page=1&pageSize=10
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Accept: application/json
+
+###
+
+# Delete user
+DELETE {{AuthService_HostAddress}}/admin/testapp/users/YOUR_USER_ID_HERE
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+
+###
+# API Key Management
+###
+
+# Get API keys for application
+GET {{AuthService_HostAddress}}/admin/testapp/api-keys?page=1&pageSize=10
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Accept: application/json
+
+###
+
+# Get specific API key
+GET {{AuthService_HostAddress}}/admin/testapp/api-keys/YOUR_API_KEY_ID_HERE
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Accept: application/json
+
+###
+
+# Create API key
+POST {{AuthService_HostAddress}}/admin/testapp/api-keys
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "name": "Test API Key",
+  "scopes": ["read", "write"],
+  "expiresInDays": 30,
+  "environment": "development"
+}
+
+###
+
+# Update API key
+PUT {{AuthService_HostAddress}}/admin/testapp/api-keys/YOUR_API_KEY_ID_HERE
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "name": "Updated API Key",
+  "scopes": ["read"],
+  "expiresInDays": 60
+}
+
+###
+
+# Revoke API key
+DELETE {{AuthService_HostAddress}}/admin/testapp/api-keys/YOUR_API_KEY_ID_HERE
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+
+###
+# API Key Validation (Internal)
+###
+
+# Validate API key
+POST {{AuthService_HostAddress}}/internal/validate-api-key
+Content-Type: application/json
+
+{
+  "apiKey": "YOUR_API_KEY_HERE",
+  "requestedScope": "read",
+  "ipAddress": "127.0.0.1",
+  "userAgent": "Test Client"
+}
+
+###
+# External OAuth Authentication
+###
+
+# Initiate Google OAuth login
+POST {{AuthService_HostAddress}}/auth/external-login
+Content-Type: application/json
+
+{
+  "provider": "google",
+  "applicationCode": "testapp",
+  "returnUrl": "http://localhost:3000/callback"
+}
+
+###
+
+# Initiate GitHub OAuth login
+POST {{AuthService_HostAddress}}/auth/external-login
+Content-Type: application/json
+
+{
+  "provider": "github",
+  "applicationCode": "testapp",
+  "returnUrl": "http://localhost:3000/callback"
+}
+
+###
+
+# Initiate Apple Sign-In
+POST {{AuthService_HostAddress}}/auth/external-login
+Content-Type: application/json
+
+{
+  "provider": "apple",
+  "applicationCode": "testapp",
+  "returnUrl": "http://localhost:3000/callback"
+}
+
+###
+
+# External login callback (this would be called by OAuth provider)
+GET {{AuthService_HostAddress}}/auth/external-callback/google
+Accept: application/json
+
+###
+
+# Link external login to existing account (requires auth)
+POST {{AuthService_HostAddress}}/auth/link-external-login
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "provider": "google",
+  "applicationCode": "testapp"
+}
+
+###
+
+# Unlink external login from account (requires auth)
+POST {{AuthService_HostAddress}}/auth/unlink-external-login
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "provider": "google",
+  "applicationCode": "testapp"
+}
+
+###
+
+# Get linked external logins for user (requires auth)
+GET {{AuthService_HostAddress}}/auth/external-logins
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Accept: application/json
+
+###
+
+# OpenAPI/Swagger Documentation
+###
+
+# Get OpenAPI specification
+GET {{AuthService_HostAddress}}/swagger/v1/swagger.json
+Accept: application/json
+
+###
+
+# Swagger UI (for browser access)
+# Open in browser: {{AuthService_HostAddress}}/swagger

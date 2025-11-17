@@ -1,453 +1,514 @@
-using System.Collections.Generic;
-using AuthService.DTOs;
-using AuthService.Models;
-using AuthService.Repositories;
-using Microsoft.AspNetCore.Http;
+using AuthService.Data;
+using AuthService.Models.DTOs;
+using AuthService.Models.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace AuthService.Services;
 
-public interface IAuthService
+public class AuthService
 {
-    Task<AuthResponse> RegisterAsync(RegisterRequest request);
-    Task<AuthResponse> LoginAsync(LoginRequest request, string? ipAddress);
-    Task<TokenResponse> RefreshTokenAsync(string refreshToken, string? ipAddress);
-    Task<bool> RevokeTokenAsync(string refreshToken, string? ipAddress);
-    Task<UserResponse?> ValidateTokenAsync(string accessToken);
-}
-
-public class AuthService : IAuthService
-{
-    private readonly IUserRepository _userRepository;
-    private readonly IRefreshTokenRepository _refreshTokenRepository;
-    private readonly ITokenService _tokenService;
-    private readonly IPasswordService _passwordService;
-    private readonly IConfiguration _configuration;
-    private readonly IPasswordPolicyValidator _passwordPolicyValidator;
-    private readonly IPasswordHistoryRepository _passwordHistoryRepository;
-    private readonly IRefreshTokenHasher _refreshTokenHasher;
-    private readonly IAuditLogger _auditLogger;
-    private readonly int _refreshTokenExpiryDays;
-    private readonly int _maxFailedLoginAttempts;
-    private readonly TimeSpan _lockoutDuration;
+    private readonly AuthDbContext _context;
+    private readonly ApplicationService _applicationService;
+    private readonly JwtTokenService _jwtTokenService;
+    private readonly IEmailService _emailService;
+    private readonly ILogger<AuthService> _logger;
 
     public AuthService(
-        IUserRepository userRepository,
-        IRefreshTokenRepository refreshTokenRepository,
-        ITokenService tokenService,
-        IPasswordService passwordService,
-        IConfiguration configuration,
-        IPasswordPolicyValidator passwordPolicyValidator,
-        IPasswordHistoryRepository passwordHistoryRepository,
-        IRefreshTokenHasher refreshTokenHasher,
-        IAuditLogger auditLogger)
+        AuthDbContext context,
+        ApplicationService applicationService,
+        JwtTokenService jwtTokenService,
+        IEmailService emailService,
+        ILogger<AuthService> logger)
     {
-        _userRepository = userRepository;
-        _refreshTokenRepository = refreshTokenRepository;
-        _tokenService = tokenService;
-        _passwordService = passwordService;
-        _configuration = configuration;
-        _passwordPolicyValidator = passwordPolicyValidator;
-        _passwordHistoryRepository = passwordHistoryRepository;
-        _refreshTokenHasher = refreshTokenHasher;
-        _auditLogger = auditLogger;
-        _refreshTokenExpiryDays = int.Parse(_configuration["Jwt:RefreshTokenExpiryDays"] ?? "7");
-        _maxFailedLoginAttempts = int.Parse(_configuration["Security:AccountLockout:MaxFailedAttempts"] ?? "5");
-        var lockoutMinutes = int.Parse(_configuration["Security:AccountLockout:LockoutMinutes"] ?? "15");
-        _lockoutDuration = TimeSpan.FromMinutes(lockoutMinutes);
+        _context = context;
+        _applicationService = applicationService;
+        _jwtTokenService = jwtTokenService;
+        _emailService = emailService;
+        _logger = logger;
     }
 
-    public async Task<AuthResponse> RegisterAsync(RegisterRequest request)
+    public async Task<TokenResponse?> RegisterUserAsync(RegisterRequest request)
     {
-        // Check if user already exists
-        var existingUser = await _userRepository.GetByEmailAsync(request.Email);
-        if (existingUser != null)
+        try
         {
-            throw new InvalidOperationException("User with this email already exists");
-        }
-
-        _passwordPolicyValidator.Validate(request.Password, request.Email);
-
-        // Create new user
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Email = request.Email.ToLowerInvariant(),
-            PasswordHash = _passwordService.HashPassword(request.Password),
-            FirstName = request.FirstName,
-            LastName = request.LastName,
-            IsEmailVerified = false,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow,
-            FailedLoginAttempts = 0,
-            PasswordUpdatedAt = DateTime.UtcNow
-        };
-
-        await _userRepository.CreateAsync(user);
-        await _passwordHistoryRepository.AddAsync(new PasswordHistory
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            PasswordHash = user.PasswordHash,
-            CreatedAt = DateTime.UtcNow
-        });
-        await _auditLogger.LogAsync(AuditEventType.PasswordChanged, new AuditEventContext
-        {
-            UserId = user.Id,
-            Email = user.Email,
-            Extras = new Dictionary<string, object?>
+            // Validate application exists and is active
+            var application = await _applicationService.GetApplicationByCodeAsync(request.ApplicationCode);
+            if (application == null || !application.IsActive)
             {
-                ["event"] = "UserRegistered"
+                _logger.LogWarning("Registration attempt for invalid or inactive application: {ApplicationCode}", request.ApplicationCode);
+                return null;
             }
-        });
 
-        // Generate tokens
-        var accessToken = _tokenService.GenerateAccessToken(user.Id, user.Email);
-        var refreshToken = _tokenService.GenerateRefreshToken();
-        var refreshTokenHash = _refreshTokenHasher.Hash(refreshToken);
+            // Check if user already exists
+            var existingUser = await _context.Users
+                .FirstOrDefaultAsync(u => u.NormalizedEmail == request.Email.ToUpper() && u.ApplicationId == application.Id);
 
-        // Save refresh token
-        var refreshTokenEntity = new RefreshToken
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            TokenHash = refreshTokenHash,
-            ExpiresAt = DateTime.UtcNow.AddDays(_refreshTokenExpiryDays),
-            CreatedAt = DateTime.UtcNow,
-            CreatedByIp = null
-        };
+            if (existingUser != null)
+            {
+                _logger.LogWarning("Registration attempt for existing user: {Email} in application: {ApplicationCode}",
+                    request.Email, request.ApplicationCode);
+                return null;
+            }
 
-        await _refreshTokenRepository.CreateAsync(refreshTokenEntity);
+            // Create new user
+            var user = new User
+            {
+                Id = Guid.NewGuid(),
+                ApplicationId = application.Id,
+                Email = request.Email,
+                NormalizedEmail = request.Email.ToUpper(),
+                PasswordHash = HashPassword(request.Password),
+                IsEmailVerified = false, // TODO: Implement email verification
+                PhoneNumber = request.PhoneNumber,
+                TwoFactorEnabled = false,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
 
-        return new AuthResponse
-        {
-            Tokens = new TokenResponse
+            _context.Users.Add(user);
+
+            // Create default role assignment (if roles exist)
+            var defaultRole = await _context.Roles
+                .FirstOrDefaultAsync(r => r.ApplicationId == application.Id && r.Name.ToLower() == "user");
+
+            if (defaultRole != null)
+            {
+                var userRole = new UserRole
+                {
+                    UserId = user.Id,
+                    RoleId = defaultRole.Id
+                };
+                _context.UserRoles.Add(userRole);
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Send email verification
+            await SendEmailVerificationAsync(request.Email, application.Id);
+
+            _logger.LogInformation("User registered successfully: {Email} in application: {ApplicationCode}",
+                user.Email, application.Code);
+
+            // Generate tokens
+            var roles = await GetUserRolesAsync(user.Id);
+            var accessToken = _jwtTokenService.GenerateAccessToken(user, application, roles);
+            var refreshToken = _jwtTokenService.GenerateRefreshToken();
+
+            // Store refresh token
+            var refreshTokenEntity = new RefreshToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                ApplicationId = application.Id,
+                Token = refreshToken,
+                ExpiresAt = DateTime.UtcNow.AddDays(7), // TODO: Configure
+                CreatedAt = DateTime.UtcNow,
+                DeviceInfo = "Registration"
+            };
+
+            _context.RefreshTokens.Add(refreshTokenEntity);
+            await _context.SaveChangesAsync();
+
+            return new TokenResponse
             {
                 AccessToken = accessToken,
                 RefreshToken = refreshToken,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(int.Parse(_configuration["Jwt:AccessTokenExpiryMinutes"] ?? "15")),
-                TokenType = "Bearer"
-            },
-            User = new UserResponse
-            {
-                Id = user.Id,
-                Email = user.Email,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                IsEmailVerified = user.IsEmailVerified,
-                CreatedAt = user.CreatedAt
-            }
-        };
+                ExpiresIn = 15 * 60, // 15 minutes
+                ExpiresAt = DateTime.UtcNow.AddMinutes(15),
+                User = new TokenResponse.UserInfo
+                {
+                    Id = user.Id,
+                    Email = user.Email,
+                    ApplicationId = application.Id,
+                    ApplicationCode = application.Code,
+                    ApplicationName = application.Name,
+                    Roles = roles,
+                    IsEmailVerified = user.IsEmailVerified,
+                    CreatedAt = user.CreatedAt,
+                    LastLoginAt = user.LastLoginAt
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error registering user: {Email}", request.Email);
+            return null;
+        }
     }
 
-    public async Task<AuthResponse> LoginAsync(LoginRequest request, string? ipAddress)
+    public async Task<TokenResponse?> LoginUserAsync(LoginRequest request)
     {
-        // Find user by email
-        var normalizedEmail = request.Email.ToLowerInvariant();
-        var user = await _userRepository.GetByEmailAsync(normalizedEmail);
-        if (user == null)
+        try
         {
-            await _auditLogger.LogAsync(AuditEventType.LoginFailed, new AuditEventContext
+            // Validate application exists and is active
+            var application = await _applicationService.GetApplicationByCodeAsync(request.ApplicationCode);
+            if (application == null || !application.IsActive)
             {
-                Email = normalizedEmail,
-                IpAddress = ipAddress,
-                DeviceInfo = request.DeviceInfo,
-                Extras = new Dictionary<string, object?>
-                {
-                    ["reason"] = "UserNotFound"
-                }
-            });
-            throw new UnauthorizedAccessException("Invalid credentials");
-        }
+                _logger.LogWarning("Login attempt for invalid or inactive application: {ApplicationCode}", request.ApplicationCode);
+                return null;
+            }
 
-        if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow)
-        {
-            await _auditLogger.LogAsync(AuditEventType.AccountLocked, new AuditEventContext
+            // Find user
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.NormalizedEmail == request.Email.ToUpper() && u.ApplicationId == application.Id);
+
+            if (user == null || !user.IsActive)
             {
+                _logger.LogWarning("Login attempt for non-existent or inactive user: {Email}", request.Email);
+                return null;
+            }
+
+            // Validate password
+            if (!ValidatePassword(request.Password, user.PasswordHash))
+            {
+                _logger.LogWarning("Invalid password for user: {Email}", request.Email);
+
+                // Log failed login attempt
+                await LogSessionAsync(user.Id, application.Id, false, request.IpAddress, request.UserAgent);
+                return null;
+            }
+
+            // Update last login
+            user.LastLoginAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            // Log successful login
+            await LogSessionAsync(user.Id, application.Id, true, request.IpAddress, request.UserAgent);
+
+            // Generate tokens
+            var roles = await GetUserRolesAsync(user.Id);
+            var accessToken = _jwtTokenService.GenerateAccessToken(user, application, roles);
+            var refreshToken = _jwtTokenService.GenerateRefreshToken();
+
+            // Store refresh token
+            var refreshTokenEntity = new RefreshToken
+            {
+                Id = Guid.NewGuid(),
                 UserId = user.Id,
-                Email = user.Email,
-                IpAddress = ipAddress
-            });
-            throw new UnauthorizedAccessException("Account is temporarily locked. Please try again later.");
-        }
-
-        // Verify password
-        if (!_passwordService.VerifyPassword(request.Password, user.PasswordHash))
-        {
-            await _auditLogger.LogAsync(AuditEventType.LoginFailed, new AuditEventContext
-            {
-                UserId = user.Id,
-                Email = user.Email,
-                IpAddress = ipAddress,
+                ApplicationId = application.Id,
+                Token = refreshToken,
+                ExpiresAt = DateTime.UtcNow.AddDays(7), // TODO: Configure
+                CreatedAt = DateTime.UtcNow,
                 DeviceInfo = request.DeviceInfo,
-                Extras = new Dictionary<string, object?>
-                {
-                    ["reason"] = "InvalidPassword"
-                }
-            });
-            await HandleFailedLoginAsync(user, ipAddress);
-            throw new UnauthorizedAccessException("Invalid credentials");
-        }
+                IpAddress = request.IpAddress
+            };
 
-        // Check if user is active
-        if (!user.IsActive)
-        {
-            throw new UnauthorizedAccessException("Account is deactivated");
-        }
+            _context.RefreshTokens.Add(refreshTokenEntity);
+            await _context.SaveChangesAsync();
 
-        // Update last login
-        user.LastLoginAt = DateTime.UtcNow;
-        user.FailedLoginAttempts = 0;
-        user.LockoutEnd = null;
-        await _userRepository.UpdateAsync(user);
-        await _auditLogger.LogAsync(AuditEventType.LoginSucceeded, new AuditEventContext
-        {
-            UserId = user.Id,
-            Email = user.Email,
-            IpAddress = ipAddress,
-            DeviceInfo = request.DeviceInfo
-        });
+            _logger.LogInformation("User logged in successfully: {Email}", user.Email);
 
-        // Generate tokens
-        var accessToken = _tokenService.GenerateAccessToken(user.Id, user.Email);
-        var refreshToken = _tokenService.GenerateRefreshToken();
-        var refreshTokenHash = _refreshTokenHasher.Hash(refreshToken);
-
-        // Save refresh token
-        var refreshTokenEntity = new RefreshToken
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            TokenHash = refreshTokenHash,
-            ExpiresAt = DateTime.UtcNow.AddDays(_refreshTokenExpiryDays),
-            CreatedAt = DateTime.UtcNow,
-            CreatedByIp = ipAddress,
-            DeviceInfo = request.DeviceInfo
-        };
-
-        await _refreshTokenRepository.CreateAsync(refreshTokenEntity);
-
-        return new AuthResponse
-        {
-            Tokens = new TokenResponse
+            return new TokenResponse
             {
                 AccessToken = accessToken,
                 RefreshToken = refreshToken,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(int.Parse(_configuration["Jwt:AccessTokenExpiryMinutes"] ?? "15")),
-                TokenType = "Bearer"
-            },
-            User = new UserResponse
-            {
-                Id = user.Id,
-                Email = user.Email,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                IsEmailVerified = user.IsEmailVerified,
-                CreatedAt = user.CreatedAt
-            }
-        };
+                ExpiresIn = 15 * 60, // 15 minutes
+                ExpiresAt = DateTime.UtcNow.AddMinutes(15),
+                User = new TokenResponse.UserInfo
+                {
+                    Id = user.Id,
+                    Email = user.Email,
+                    ApplicationId = application.Id,
+                    ApplicationCode = application.Code,
+                    ApplicationName = application.Name,
+                    Roles = roles,
+                    IsEmailVerified = user.IsEmailVerified,
+                    CreatedAt = user.CreatedAt,
+                    LastLoginAt = user.LastLoginAt
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error logging in user: {Email}", request.Email);
+            return null;
+        }
     }
 
-    public async Task<TokenResponse> RefreshTokenAsync(string refreshToken, string? ipAddress)
+    public string HashPassword(string password)
     {
-        var token = await _refreshTokenRepository.GetByTokenAsync(refreshToken);
-        
-        if (token == null)
-        {
-            await _auditLogger.LogAsync(AuditEventType.RefreshFailed, new AuditEventContext
-            {
-                IpAddress = ipAddress,
-                Extras = new Dictionary<string, object?>
-                {
-                    ["reason"] = "TokenNotFound"
-                }
-            });
-            throw new UnauthorizedAccessException("Invalid refresh token");
-        }
+        return BCrypt.Net.BCrypt.HashPassword(password);
+    }
 
-        if (!token.IsActive)
-        {
-            if (token.IsRevoked && token.ReplacedByTokenHash != null)
-            {
-                await _refreshTokenRepository.MarkAsReusedAsync(token, ipAddress);
-                await _refreshTokenRepository.RevokeAllUserTokensAsync(token.UserId, ipAddress);
-            }
+    public bool ValidatePassword(string password, string hashedPassword)
+    {
+        return BCrypt.Net.BCrypt.Verify(password, hashedPassword);
+    }
 
-            await _auditLogger.LogAsync(AuditEventType.RefreshFailed, new AuditEventContext
-            {
-                UserId = token.UserId,
-                IpAddress = ipAddress,
-                Extras = new Dictionary<string, object?>
-                {
-                    ["reason"] = "TokenInactive"
-                }
-            });
-            throw new UnauthorizedAccessException("Invalid refresh token");
-        }
+    private async Task<List<string>> GetUserRolesAsync(Guid userId)
+    {
+        var roles = await _context.UserRoles
+            .Where(ur => ur.UserId == userId)
+            .Select(ur => ur.Role.Name)
+            .ToListAsync();
 
-        var user = await _userRepository.GetByIdAsync(token.UserId);
-        if (user == null || !user.IsActive)
-        {
-            await _auditLogger.LogAsync(AuditEventType.RefreshFailed, new AuditEventContext
-            {
-                UserId = token.UserId,
-                IpAddress = ipAddress,
-                Extras = new Dictionary<string, object?>
-                {
-                    ["reason"] = "UserInactive"
-                }
-            });
-            throw new UnauthorizedAccessException("User not found or inactive");
-        }
+        return roles;
+    }
 
-        // Revoke old token
-        token.IsRevoked = true;
-        token.RevokedAt = DateTime.UtcNow;
-        token.RevokedByIp = ipAddress;
-        token.RevokedReason = RefreshTokenRevocationReasons.Replaced;
-
-        // Generate new tokens
-        var newAccessToken = _tokenService.GenerateAccessToken(user.Id, user.Email);
-        var newRefreshToken = _tokenService.GenerateRefreshToken();
-        var newRefreshTokenHash = _refreshTokenHasher.Hash(newRefreshToken);
-
-        // Save new refresh token
-        var newRefreshTokenEntity = new RefreshToken
+    private async Task LogSessionAsync(Guid userId, Guid applicationId, bool isSuccessful, string? ipAddress, string? userAgent)
+    {
+        var sessionLog = new SessionLog
         {
             Id = Guid.NewGuid(),
-            UserId = user.Id,
-            TokenHash = newRefreshTokenHash,
-            ExpiresAt = DateTime.UtcNow.AddDays(_refreshTokenExpiryDays),
-            CreatedAt = DateTime.UtcNow,
-            CreatedByIp = ipAddress,
-            DeviceInfo = token.DeviceInfo
-        };
-
-        await _refreshTokenRepository.CreateAsync(newRefreshTokenEntity);
-        token.ReplacedByTokenHash = newRefreshTokenHash;
-        await _refreshTokenRepository.UpdateAsync(token);
-        await _auditLogger.LogAsync(AuditEventType.RefreshSucceeded, new AuditEventContext
-        {
-            UserId = user.Id,
-            Email = user.Email,
+            UserId = userId,
+            ApplicationId = applicationId,
+            LoginAt = isSuccessful ? DateTime.UtcNow : null,
+            LogoutAt = null, // Will be set on logout
             IpAddress = ipAddress,
-            DeviceInfo = token.DeviceInfo,
-            Extras = new Dictionary<string, object?>
+            UserAgent = userAgent,
+            IsSuccessful = isSuccessful
+        };
+
+        _context.SessionLogs.Add(sessionLog);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<bool> LogoutUserAsync(string refreshToken)
+    {
+        try
+        {
+            // Find the refresh token
+            var refreshTokenEntity = await _context.RefreshTokens
+                .Include(rt => rt.User)
+                .Include(rt => rt.Application)
+                .FirstOrDefaultAsync(rt => rt.Token == refreshToken && !rt.RevokedAt.HasValue);
+
+            if (refreshTokenEntity == null)
             {
-                ["refreshTokenId"] = newRefreshTokenEntity.Id
+                _logger.LogWarning("Logout attempt with invalid refresh token");
+                return false;
             }
-        });
 
-        return new TokenResponse
-        {
-            AccessToken = newAccessToken,
-            RefreshToken = newRefreshToken,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(int.Parse(_configuration["Jwt:AccessTokenExpiryMinutes"] ?? "15")),
-            TokenType = "Bearer"
-        };
-    }
+            // Revoke the refresh token
+            refreshTokenEntity.RevokedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
 
-    public async Task<bool> RevokeTokenAsync(string refreshToken, string? ipAddress)
-    {
-        var token = await _refreshTokenRepository.GetByTokenAsync(refreshToken);
-        
-        if (token == null)
-        {
-            await _auditLogger.LogAsync(AuditEventType.RevokeFailed, new AuditEventContext
+            // Find the most recent login session for this user and mark it as logged out
+            var recentSession = await _context.SessionLogs
+                .Where(sl => sl.UserId == refreshTokenEntity.UserId &&
+                           sl.ApplicationId == refreshTokenEntity.ApplicationId &&
+                           sl.IsSuccessful &&
+                           sl.LogoutAt == null)
+                .OrderByDescending(sl => sl.LoginAt)
+                .FirstOrDefaultAsync();
+
+            if (recentSession != null)
             {
-                IpAddress = ipAddress,
-                Extras = new Dictionary<string, object?>
-                {
-                    ["reason"] = "TokenNotFound"
-                }
-            });
+                recentSession.LogoutAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+            }
+
+            _logger.LogInformation("User {UserId} logged out successfully", refreshTokenEntity.UserId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during user logout");
             return false;
         }
-
-        if (!token.IsActive)
-        {
-            await _auditLogger.LogAsync(AuditEventType.RevokeFailed, new AuditEventContext
-            {
-                UserId = token.UserId,
-                IpAddress = ipAddress,
-                Extras = new Dictionary<string, object?>
-                {
-                    ["reason"] = "TokenInactive"
-                }
-            });
-            return false;
-        }
-
-        token.IsRevoked = true;
-        token.RevokedAt = DateTime.UtcNow;
-        token.RevokedByIp = ipAddress;
-        token.RevokedReason = RefreshTokenRevocationReasons.ManuallyRevoked;
-        await _refreshTokenRepository.UpdateAsync(token);
-        await _auditLogger.LogAsync(AuditEventType.RevokeSucceeded, new AuditEventContext
-        {
-            UserId = token.UserId,
-            IpAddress = ipAddress
-        });
-
-        return true;
     }
 
-    public async Task<UserResponse?> ValidateTokenAsync(string accessToken)
+    public async Task<bool> SendEmailVerificationAsync(string email, Guid applicationId)
     {
-        var principal = _tokenService.ValidateAccessToken(accessToken);
-        if (principal == null)
+        try
         {
-            await _auditLogger.LogAsync(AuditEventType.TokenValidationFailed, new AuditEventContext());
-            return null;
-        }
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.NormalizedEmail == email.ToUpper() && u.ApplicationId == applicationId);
 
-        var userIdClaim = principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
-        if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
-        {
-            return null;
-        }
-
-        var user = await _userRepository.GetByIdAsync(userId);
-        if (user == null || !user.IsActive)
-        {
-            await _auditLogger.LogAsync(AuditEventType.TokenValidationFailed, new AuditEventContext
+            if (user == null)
             {
-                UserId = userId
-            });
-            return null;
-        }
+                _logger.LogWarning("Email verification requested for non-existent user: {Email}", email);
+                return false; // Don't reveal if user exists or not
+            }
 
-        await _auditLogger.LogAsync(AuditEventType.TokenValidated, new AuditEventContext
-        {
-            UserId = user.Id,
-            Email = user.Email
-        });
-
-        return new UserResponse
-        {
-            Id = user.Id,
-            Email = user.Email,
-            FirstName = user.FirstName,
-            LastName = user.LastName,
-            IsEmailVerified = user.IsEmailVerified,
-            CreatedAt = user.CreatedAt
-        };
-    }
-    private async Task HandleFailedLoginAsync(User user, string? ipAddress)
-    {
-        user.FailedLoginAttempts += 1;
-
-        if (user.FailedLoginAttempts >= _maxFailedLoginAttempts)
-        {
-            user.LockoutEnd = DateTime.UtcNow.Add(_lockoutDuration);
-            user.FailedLoginAttempts = 0;
-            await _auditLogger.LogAsync(AuditEventType.AccountLocked, new AuditEventContext
+            if (user.IsEmailVerified)
             {
+                _logger.LogInformation("Email already verified for user: {Email}", email);
+                return true;
+            }
+
+            // Generate verification token
+            var token = GenerateSecureToken();
+            var emailToken = new EmailToken
+            {
+                Id = Guid.NewGuid(),
                 UserId = user.Id,
-                Email = user.Email,
-                IpAddress = ipAddress
-            });
-        }
+                Token = token,
+                TokenType = "email_verification",
+                ExpiresAt = DateTime.UtcNow.AddHours(24), // 24 hours
+                CreatedAt = DateTime.UtcNow,
+                IsUsed = false
+            };
 
-        await _userRepository.UpdateAsync(user);
+            _context.EmailTokens.Add(emailToken);
+            await _context.SaveChangesAsync();
+
+            // Send verification email
+            await _emailService.SendVerificationEmailAsync(email, token);
+
+            _logger.LogInformation("Email verification sent to: {Email}", email);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending email verification for: {Email}", email);
+            return false;
+        }
+    }
+
+    public async Task<bool> VerifyEmailAsync(string email, string token)
+    {
+        try
+        {
+            var emailToken = await _context.EmailTokens
+                .Include(et => et.User)
+                .FirstOrDefaultAsync(et =>
+                    et.User.NormalizedEmail == email.ToUpper() &&
+                    et.Token == token &&
+                    et.TokenType == "email_verification" &&
+                    !et.IsUsed &&
+                    et.ExpiresAt > DateTime.UtcNow);
+
+            if (emailToken == null)
+            {
+                _logger.LogWarning("Invalid or expired email verification token for: {Email}", email);
+                return false;
+            }
+
+            // Mark email as verified
+            emailToken.User.IsEmailVerified = true;
+            emailToken.IsUsed = true;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Email verified successfully for: {Email}", email);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error verifying email for: {Email}", email);
+            return false;
+        }
+    }
+
+    public async Task<bool> RequestPasswordResetAsync(string email, Guid applicationId)
+    {
+        try
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.NormalizedEmail == email.ToUpper() && u.ApplicationId == applicationId);
+
+            if (user == null)
+            {
+                _logger.LogWarning("Password reset requested for non-existent user: {Email}", email);
+                return true; // Don't reveal if user exists or not
+            }
+
+            // Generate reset token
+            var token = GenerateSecureToken();
+            var emailToken = new EmailToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                Token = token,
+                TokenType = "password_reset",
+                ExpiresAt = DateTime.UtcNow.AddHours(1), // 1 hour
+                CreatedAt = DateTime.UtcNow,
+                IsUsed = false
+            };
+
+            _context.EmailTokens.Add(emailToken);
+            await _context.SaveChangesAsync();
+
+            // Send password reset email
+            await _emailService.SendPasswordResetEmailAsync(email, token);
+
+            _logger.LogInformation("Password reset email sent to: {Email}", email);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending password reset for: {Email}", email);
+            return false;
+        }
+    }
+
+    public async Task<bool> ResetPasswordAsync(string email, string token, string newPassword)
+    {
+        try
+        {
+            var emailToken = await _context.EmailTokens
+                .Include(et => et.User)
+                .FirstOrDefaultAsync(et =>
+                    et.User.NormalizedEmail == email.ToUpper() &&
+                    et.Token == token &&
+                    et.TokenType == "password_reset" &&
+                    !et.IsUsed &&
+                    et.ExpiresAt > DateTime.UtcNow);
+
+            if (emailToken == null)
+            {
+                _logger.LogWarning("Invalid or expired password reset token for: {Email}", email);
+                return false;
+            }
+
+            // Update password
+            emailToken.User.PasswordHash = HashPassword(newPassword);
+            emailToken.IsUsed = true;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Password reset successfully for: {Email}", email);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error resetting password for: {Email}", email);
+            return false;
+        }
+    }
+
+    public async Task<bool> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword)
+    {
+        try
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                _logger.LogWarning("Password change attempted for non-existent user: {UserId}", userId);
+                return false;
+            }
+
+            // Verify current password
+            if (!ValidatePassword(currentPassword, user.PasswordHash))
+            {
+                _logger.LogWarning("Invalid current password for user: {UserId}", userId);
+                return false;
+            }
+
+            // Update password
+            user.PasswordHash = HashPassword(newPassword);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Password changed successfully for user: {UserId}", userId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error changing password for user: {UserId}", userId);
+            return false;
+        }
+    }
+
+    private string GenerateSecureToken()
+    {
+        // Generate a secure random token
+        var bytes = new byte[32];
+        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        rng.GetBytes(bytes);
+        return Convert.ToBase64String(bytes)
+            .Replace("+", "-")
+            .Replace("/", "_")
+            .Replace("=", "");
     }
 }

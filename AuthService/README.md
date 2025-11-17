@@ -1,307 +1,285 @@
-# Authentication Microservice
+# Auth Service
 
-A production-ready authentication microservice built with ASP.NET Core that provides JWT-based authentication for all your applications.
+A comprehensive multi-tenant authentication and authorization service built with ASP.NET Core 10.0, featuring JWT tokens, API key management, role-based access control, and an admin dashboard.
 
 ## Features
 
-- **User Registration & Login** - Secure user authentication with email and password
-- **JWT Tokens** - Access tokens with configurable expiry
-- **Refresh Tokens** - Long-lived refresh tokens for seamless re-authentication
-- **Token Validation** - Validate tokens across all your services
-- **Token Revocation** - Logout and revoke refresh tokens
-- **PostgreSQL Database** - Reliable data persistence
-- **CORS Support** - Ready for microservice architecture
-- **Swagger Documentation** - Interactive API documentation
+- **Multi-tenant Architecture**: Isolated user management per application
+- **JWT Authentication**: Secure token-based authentication with refresh tokens
+- **API Key Management**: Generate, validate, and manage API keys with rate limiting
+- **Role-Based Access Control**: Granular permissions system
+- **Admin Dashboard**: Web interface for user and application management
+- **Session Logging**: Complete audit trail of user activities
+- **Health Checks**: Monitoring endpoints for system health
+- **Docker Support**: Containerized deployment ready
 
-## Project Structure
+## Tech Stack
 
-```
-AuthService/
-├── Controllers/        # API endpoints
-├── Services/          # Business logic (Auth, Token, Password)
-├── Repositories/      # Data access layer
-├── Models/           # Database entities (User, RefreshToken)
-├── DTOs/             # Data transfer objects
-├── Data/             # DbContext configuration
-├── Middleware/       # JWT validation middleware
-└── Program.cs        # Application entry point
-```
+- **ASP.NET Core 10.0**
+- **Entity Framework Core 9.0**
+- **PostgreSQL** (via Npgsql)
+- **JWT Bearer Authentication**
+- **BCrypt** for password hashing
+- **Swagger/OpenAPI** for API documentation
+- **Bootstrap 5** for admin dashboard
 
-## Prerequisites
+## Quick Start
+
+### Prerequisites
 
 - .NET 10.0 SDK
-- PostgreSQL database
-- DotNetEnv for environment variables
+- PostgreSQL 16+
+- Docker & Docker Compose (optional)
 
-## Configuration
+### Local Development with Docker
 
-### Environment Variables (.env)
-```env
-DATABASE_HOST=your-db-hostname
-DATABASE_PORT=5432
-DATABASE_USER=your-db-user
-DATABASE_PASSWORD=your-db-password
-DATABASE_NAME=authservice
-```
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd AuthService
+   ```
 
-> **Important:** The previous sample values contained real credentials and have been scrubbed. Rotate any deployments that may have used them and re-issue fresh secrets through your secrets manager.
+2. **Start services with Docker Compose**
+   ```bash
+   docker-compose up -d
+   ```
 
-### JWT Settings (appsettings.json)
-```json
-{
-  "Jwt": {
-    "Secret": "your-super-secret-jwt-key-min-32-characters-long",
-    "Issuer": "AuthService",
-    "Audience": "AuthServiceClients",
-    "AccessTokenExpiryMinutes": "15",
-    "RefreshTokenExpiryDays": "7"
-  }
-}
-```
+3. **Access the application**
+   - API: http://localhost:8080
+   - Swagger UI: http://localhost:8080/swagger
+   - Health Check: http://localhost:8080/health
 
-## Installation
+### Manual Setup
 
-1. **Restore packages**
+1. **Install dependencies**
    ```bash
    dotnet restore
    ```
 
-2. **Update database**
+2. **Configure database**
+   Update `appsettings.json` with your PostgreSQL connection string:
+   ```json
+   {
+     "ConnectionStrings": {
+       "DefaultConnection": "Host=localhost;Port=5432;Username=youruser;Password=yourpassword;Database=authservice"
+     }
+   }
+   ```
+
+3. **Run database migrations**
    ```bash
-   dotnet ef migrations add InitialCreate
    dotnet ef database update
    ```
 
-3. **Run the service**
+4. **Start the application**
    ```bash
    dotnet run
    ```
 
-The service will start on `https://localhost:5001` (or configured port)
-
 ## API Endpoints
 
 ### Authentication
+- `POST /auth/register` - Register new user
+- `POST /auth/login` - User login
+- `POST /auth/refresh` - Refresh access token
+- `POST /auth/logout` - User logout
+- `GET /auth/me` - Get current user info
 
-#### Register User
-```http
-POST /api/auth/register
-Content-Type: application/json
+### Application Management (Admin)
+- `GET /admin/apps` - List all applications
+- `POST /admin/apps` - Create application
+- `GET /admin/apps/{id}` - Get application details
+- `PUT /admin/apps/{id}` - Update application
+- `DELETE /admin/apps/{id}` - Delete application
 
-{
-  "email": "user@example.com",
-  "password": "SecurePassword123",
-  "firstName": "John",
-  "lastName": "Doe"
-}
+### User Management (Admin)
+- `GET /admin/{app}/users` - List users in application
+- `GET /admin/{app}/users/{id}` - Get user details
+- `PUT /admin/{app}/users/{id}` - Update user
+- `DELETE /admin/{app}/users/{id}` - Delete user
+- `POST /admin/{app}/users/{id}/roles` - Assign role to user
+- `DELETE /admin/{app}/users/{id}/roles/{role}` - Remove role from user
+
+### API Key Management
+- `GET /admin/{app}/api-keys` - List API keys
+- `POST /admin/{app}/api-keys` - Create API key
+- `PUT /admin/{app}/api-keys/{id}` - Update API key
+- `DELETE /admin/{app}/api-keys/{id}` - Revoke API key
+- `POST /internal/validate-api-key` - Validate API key
+
+### Health & Monitoring
+- `GET /health` - Overall health status
+- `GET /health/live` - Liveness probe
+- `GET /health/ready` - Readiness probe
+
+## Database Schema
+
+### Core Entities
+- **Applications**: Multi-tenant application definitions
+- **Users**: User accounts scoped to applications
+- **Roles**: Permission roles within applications
+- **UserRoles**: Many-to-many user-role relationships
+- **RefreshTokens**: JWT refresh token storage
+- **SessionLogs**: Audit trail of user sessions
+- **ApiKeys**: API key management with scopes
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Database
+ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Username=user;Password=pass;Database=auth
+
+# JWT Settings
+Jwt__Key=your-super-secret-jwt-key-that-should-be-at-least-256-bits-long
+Jwt__Issuer=https://auth.yourdomain.com
+Jwt__Audience=your-microservices
+Jwt__AccessTokenExpirationMinutes=15
+Jwt__RefreshTokenExpirationDays=7
+
+# Application
+ASPNETCORE_ENVIRONMENT=Development
+ASPNETCORE_URLS=http://+:8080
 ```
 
-#### Login
-```http
-POST /api/auth/login
-Content-Type: application/json
+### JWT Token Structure
 
-{
-  "email": "user@example.com",
-  "password": "SecurePassword123",
-  "deviceInfo": "Chrome/Windows"
-}
-```
-
-**Response:**
 ```json
 {
-  "tokens": {
-    "accessToken": "eyJhbGc...",
-    "refreshToken": "base64string...",
-    "expiresAt": "2025-11-17T12:00:00Z",
-    "tokenType": "Bearer"
-  },
-  "user": {
-    "id": "guid",
-    "email": "user@example.com",
-    "firstName": "John",
-    "lastName": "Doe",
-    "isEmailVerified": false,
-    "createdAt": "2025-11-17T11:00:00Z"
-  }
+  "sub": "user-guid",
+  "app": "application-code",
+  "app_id": "application-guid",
+  "email": "user@example.com",
+  "roles": ["admin", "user"],
+  "iat": 1731800000,
+  "exp": 1731803600,
+  "iss": "https://auth.yourdomain.com",
+  "aud": "your-microservices"
 }
 ```
 
-#### Refresh Token
-```http
-POST /api/auth/refresh
-Content-Type: application/json
+## Testing
 
-{
-  "refreshToken": "base64string..."
-}
-```
+### HTTP Tests
 
-#### Revoke Token (Logout)
-```http
-POST /api/auth/revoke
-Content-Type: application/json
+Use the included `AuthService.http` file with VS Code REST Client extension:
 
-{
-  "refreshToken": "base64string..."
-}
-```
-
-#### Validate Token
-```http
-POST /api/auth/validate
-Content-Type: application/json
-
-{
-  "accessToken": "eyJhbGc..."
-}
-```
-
-#### Get Current User
-```http
-GET /api/auth/me
-Authorization: Bearer eyJhbGc...
-```
-
-### Health Check
-```http
-GET /health
-```
-
-## Using the Service in Your Applications
-
-### 1. Register/Login to get tokens
-```javascript
-// Example: Login request
-const response = await fetch('https://auth-service/api/auth/login', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    email: 'user@example.com',
-    password: 'password123'
-  })
-});
-
-const { tokens, user } = await response.json();
-// Store tokens securely
-```
-
-### 2. Use access token in your apps
-```javascript
-// Add to requests in other services
-fetch('https://your-api/protected-endpoint', {
-  headers: {
-    'Authorization': `Bearer ${accessToken}`
-  }
-});
-```
-
-### 3. Validate tokens in other services
-```javascript
-// Validate token from AuthService
-const response = await fetch('https://auth-service/api/auth/validate', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ accessToken })
-});
-
-const user = await response.json();
-```
-
-### 4. Refresh when token expires
-```javascript
-// Refresh the access token
-const response = await fetch('https://auth-service/api/auth/refresh', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ refreshToken })
-});
-
-const { accessToken, refreshToken: newRefreshToken } = await response.json();
-```
-
-## Database Migrations
-
-Create a new migration:
 ```bash
-dotnet ef migrations add MigrationName
+# Install REST Client extension in VS Code
+# Open AuthService.http and run individual requests
 ```
 
-Apply migrations:
+### Health Checks
+
 ```bash
-dotnet ef database update
+# Overall health
+curl http://localhost:8080/health
+
+# Liveness probe
+curl http://localhost:8080/health/live
+
+# Readiness probe
+curl http://localhost:8080/health/ready
 ```
 
-Remove last migration:
+## Deployment
+
+### Docker Production Build
+
 ```bash
-dotnet ef migrations remove
+# Build production image
+docker build -t authservice:latest .
+
+# Run with environment variables
+docker run -d \
+  --name authservice \
+  -p 8080:8080 \
+  -e ConnectionStrings__DefaultConnection="Host=db;Port=5432;Username=user;Password=pass;Database=auth" \
+  -e Jwt__Key="your-production-jwt-key" \
+  authservice:latest
 ```
 
-## Security Best Practices
+### Kubernetes Deployment
 
-1. **Change JWT Secret** - Update the JWT secret in production to a strong, random value
-2. **Use HTTPS** - Always use HTTPS in production
-3. **Secure Storage** - Store refresh tokens securely (httpOnly cookies or secure storage)
-4. **Token Expiry** - Keep access token expiry short (15-60 minutes)
-5. **Refresh Token Rotation** - Implemented - old refresh tokens are revoked when refreshed
-6. **Environment Variables** - Never commit `.env` file with real credentials
-7. **Database-Driven CORS** - Manage allowed origins through the `CorsOrigins` table so you can add/remove tenants without redeploying
-
-## Development
-
-### Swagger UI
-Access interactive API documentation at: `https://localhost:5001/swagger`
-
-### Logging
-Logs are configured in `appsettings.json`. In development, EF Core SQL queries are logged.
-
-### Audit Logging & Monitoring
-- Authentication events (login, refresh, revoke, validate, account lock, etc.) are shipped to the SIEM endpoint defined in `Monitoring:Siem`.
-- Configure `Monitoring:Siem:Endpoint` (e.g., `https://siem.company.com/events`) and optional `Monitoring:Siem:ApiKey`.
-- Each event includes user, IP, device info, and contextual metadata for dashboards/alerts.
-
-### Background Security Jobs
-- A hosted scheduler runs `RefreshTokenCleanupJob` and `DormantAccountReviewJob`.
-- Configure `Security:Cleanup:IntervalMinutes` to control how often jobs run.
-- Adjust `Security:DormantAccountDays` to tune dormant-account detection.
-- Extend by registering additional `ISecurityJob` implementations.
-
-## Runbooks & Incident Response
-Refer to `DEPLOYMENT_RUNBOOK.md` for:
-- Secure deployment checklist and smoke tests
-- Incident response steps (auth outage, security event)
-- Recovery procedures and escalation contacts
-
-### Managing CORS Origins
-Allowed origins are stored in the database (`CorsOrigins` table) so changes can be made without code updates.
-
-```sql
--- Allow https://app.example.com
-INSERT INTO "CorsOrigins" ("Id", "Origin", "IsActive")
-VALUES (gen_random_uuid(), 'https://app.example.com', true);
-
--- Disable an origin
-UPDATE "CorsOrigins"
-SET "IsActive" = false, "UpdatedAt" = NOW()
-WHERE "Origin" = 'https://old.example.com';
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authservice
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: authservice
+  template:
+    metadata:
+      labels:
+        app: authservice
+    spec:
+      containers:
+      - name: authservice
+        image: authservice:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: ASPNETCORE_URLS
+          value: "http://+:8080"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
 ```
 
-After updating the table, the in-memory cache refreshes automatically within five minutes (configurable in `DatabaseCorsPolicyProvider`).
+## Security Features
 
-## Production Deployment
+- **Password Hashing**: BCrypt with salt
+- **JWT Tokens**: Secure token-based authentication
+- **API Key Rate Limiting**: 100 requests per minute per key
+- **Session Logging**: Complete audit trail
+- **Input Validation**: Comprehensive model validation
+- **CORS Protection**: Configurable cross-origin policies
 
-1. Update JWT secret to a strong random value
-2. Configure proper CORS policies (don't use AllowAll)
-3. Set appropriate token expiry times
-4. Enable HTTPS
-5. Set up proper logging and monitoring
-6. Use connection string from secure configuration
-7. Enable rate limiting
-8. Consider adding email verification
-9. Implement account lockout after failed attempts
-10. Add API key for service-to-service calls
+## Monitoring & Logging
+
+- **Structured Logging**: Serilog integration ready
+- **Health Checks**: Database connectivity and self-checks
+- **Metrics**: Request counting and performance monitoring
+- **Error Handling**: Comprehensive exception handling with proper HTTP status codes
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Submit a pull request
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Support
+
+For support and questions:
+- Create an issue in the repository
+- Check the documentation in this README
+- Review the API documentation at `/swagger`
+
+---
+
+**Note**: This is a production-ready authentication service. For production deployment, ensure:
+- Use strong, randomly generated JWT keys
+- Configure proper database credentials
+- Set up SSL/TLS certificates
+- Implement proper monitoring and alerting
+- Regular security updates and patches

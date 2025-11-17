@@ -1,35 +1,25 @@
-using System.Text;
 using AuthService.Data;
-using AuthService.Middleware;
-using AuthService.Repositories;
 using AuthService.Services;
-using AuthService.Services.Background;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Cors.Infrastructure;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using DotNetEnv;
-
-// Load environment variables from .env file
-Env.Load();
+using System.Text;
+using Services = AuthService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
-var isDevelopment = builder.Environment.IsDevelopment();
 
-// Configure Database
-var connectionString = $"Host={Environment.GetEnvironmentVariable("DATABASE_HOST")};" +
-                      $"Port={Environment.GetEnvironmentVariable("DATABASE_PORT")};" +
-                      $"Database={Environment.GetEnvironmentVariable("DATABASE_NAME")};" +
-                      $"Username={Environment.GetEnvironmentVariable("DATABASE_USER")};" +
-                      $"Password={Environment.GetEnvironmentVariable("DATABASE_PASSWORD")}";
+// Add services to the container
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
+// Configure Entity Framework with PostgreSQL
 builder.Services.AddDbContext<AuthDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Configure JWT Authentication
-var jwtSecret = builder.Configuration["Jwt:Secret"] ?? throw new InvalidOperationException("JWT Secret not configured");
-var key = Encoding.UTF8.GetBytes(jwtSecret);
+var jwtSettings = builder.Configuration.GetSection("Jwt");
+var key = Encoding.UTF8.GetBytes(jwtSettings["Key"] ?? throw new InvalidOperationException("JWT Key not configured"));
 
 builder.Services.AddAuthentication(options =>
 {
@@ -38,97 +28,188 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = !isDevelopment;
-    options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(key),
         ValidateIssuer = true,
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidateAudience = true,
-        ValidAudience = builder.Configuration["Jwt:Audience"],
         ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSettings["Issuer"],
+        ValidAudience = jwtSettings["Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(key),
         ClockSkew = TimeSpan.Zero
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnAuthenticationFailed = context =>
+        {
+            Console.WriteLine($"Authentication failed: {context.Exception.Message}");
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = context =>
+        {
+            Console.WriteLine($"Token validated for user: {context.Principal?.Identity?.Name}");
+            return Task.CompletedTask;
+        }
     };
 });
 
-// Register Services
-builder.Services.AddMemoryCache();
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
-builder.Services.AddScoped<ICorsOriginRepository, CorsOriginRepository>();
-builder.Services.AddScoped<IPasswordHistoryRepository, PasswordHistoryRepository>();
-builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
-builder.Services.AddScoped<IUserSessionRepository, UserSessionRepository>();
-builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
-builder.Services.AddScoped<ITokenService, TokenService>();
-builder.Services.AddScoped<IPasswordService, PasswordService>();
-builder.Services.AddScoped<IAuthService, AuthService.Services.AuthService>();
-builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
-builder.Services.AddSingleton<ICorsPolicyProvider, DatabaseCorsPolicyProvider>();
-builder.Services.AddSingleton<IRefreshTokenHasher, Sha256RefreshTokenHasher>();
-builder.Services.AddSingleton<IRateLimiter, InMemoryRateLimiter>();
-builder.Services.AddSingleton<IPasswordPolicyValidator, PasswordPolicyValidator>();
-builder.Services.AddHttpClient();
-builder.Services.AddSingleton<IAuditLogger, SiemAuditLogger>();
-builder.Services.AddScoped<ISecurityJob, RefreshTokenCleanupJob>();
-builder.Services.AddScoped<ISecurityJob, DormantAccountReviewJob>();
-builder.Services.AddHostedService<SecurityJobScheduler>();
+// Add authorization
+builder.Services.AddAuthorization();
 
-// Add Controllers
-builder.Services.AddControllers();
+// Configure OAuth providers
+builder.Services.AddAuthentication()
+    .AddGoogle(options =>
+    {
+        options.ClientId = builder.Configuration["OAuth:Google:ClientId"] ?? "";
+        options.ClientSecret = builder.Configuration["OAuth:Google:ClientSecret"] ?? "";
+        options.CallbackPath = "/auth/external-callback/google";
 
-// Add Razor Pages for Admin Dashboard
+        // Request additional scopes
+        options.Scope.Add("email");
+        options.Scope.Add("profile");
+
+        // Save tokens for refresh
+        options.SaveTokens = true;
+
+        options.Events.OnCreatingTicket = async context =>
+        {
+            // Store additional user info from Google
+            var picture = context.User.GetProperty("picture").GetString();
+            var locale = context.User.GetProperty("locale").GetString();
+
+            // You can store this in claims or database as needed
+            context.Identity?.AddClaim(new System.Security.Claims.Claim("picture", picture ?? ""));
+            context.Identity?.AddClaim(new System.Security.Claims.Claim("locale", locale ?? ""));
+        };
+    })
+    .AddOAuth("GitHub", options =>
+    {
+        options.ClientId = builder.Configuration["OAuth:GitHub:ClientId"] ?? "";
+        options.ClientSecret = builder.Configuration["OAuth:GitHub:ClientSecret"] ?? "";
+        options.CallbackPath = "/auth/external-callback/github";
+        options.AuthorizationEndpoint = "https://github.com/login/oauth/authorize";
+        options.TokenEndpoint = "https://github.com/login/oauth/access_token";
+        options.UserInformationEndpoint = "https://api.github.com/user";
+        options.SaveTokens = true;
+
+        options.Scope.Add("user:email");
+        options.Scope.Add("read:user");
+
+        // Note: GitHub OAuth will work with default claim mapping
+        // Additional claim mapping can be added if needed
+    })
+    .AddOAuth("Apple", options =>
+    {
+        options.ClientId = builder.Configuration["OAuth:Apple:ClientId"] ?? "";
+        options.ClientSecret = builder.Configuration["OAuth:Apple:ClientSecret"] ?? "";
+        options.CallbackPath = "/auth/external-callback/apple";
+        options.AuthorizationEndpoint = "https://appleid.apple.com/auth/authorize";
+        options.TokenEndpoint = "https://appleid.apple.com/auth/token";
+        options.UserInformationEndpoint = "https://appleid.apple.com/auth/userinfo";
+
+        // Apple uses JWT client authentication, but for simplicity we'll use client_secret
+        // In production, you'd generate JWT tokens for client authentication
+        options.SaveTokens = true;
+
+        options.Scope.Add("email");
+        options.Scope.Add("name");
+
+        // Note: Apple Sign-In requires additional configuration for JWT client auth
+        // This is a simplified implementation - production should use proper JWT client auth
+    });
+
+// Add health checks
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AuthDbContext>("database")
+    .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy());
+
+// Register application services
+builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddScoped<ApplicationService>();
+builder.Services.AddScoped<Services.AuthService>();
+builder.Services.AddScoped<RoleService>();
+builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<ApiKeyService>();
+builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
+builder.Services.AddScoped<IExternalLoginService, ExternalLoginService>();
+
+// Register email service (use console service in development, real service in production)
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddScoped<IEmailService, ConsoleEmailService>();
+}
+else
+{
+    builder.Services.AddScoped<IEmailService, EmailService>();
+}
+
+// Add Razor Pages for dashboard (if needed)
 builder.Services.AddRazorPages();
 
-builder.Services.AddHttpsRedirection(options =>
+// Add CORS
+builder.Services.AddCors(options =>
 {
-    options.RedirectStatusCode = StatusCodes.Status308PermanentRedirect;
-    options.HttpsPort = 443;
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
 });
-
-// Configure CORS service (policy resolved from database provider)
-builder.Services.AddCors();
-
-// Swagger disabled due to .NET 10 compatibility issues
-// Use /admin dashboard instead
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
-if (isDevelopment)
+if (app.Environment.IsDevelopment())
 {
-    // Swagger disabled - use /admin dashboard
-    app.UseDeveloperExceptionPage();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
-if (!isDevelopment)
-{
-    app.UseHsts();
-    app.UseHttpsRedirection();
-}
+app.UseHttpsRedirection();
 
-// Enable CORS with dynamic policy
-app.UseCors(CorsPolicyNames.DynamicCors);
+// Enable CORS
+app.UseCors("AllowAll");
 
-// API Key Validation Middleware (before JWT)
-app.UseApiKeyValidation();
-
-// Custom JWT Middleware
-app.UseMiddleware<JwtMiddleware>();
-
+// Enable authentication and authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Serve static files for dashboard
-app.UseStaticFiles();
-
+// Map controllers
 app.MapControllers();
+
+// Map Razor Pages (for dashboard)
 app.MapRazorPages();
 
-// Health check endpoint
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
-    .WithName("HealthCheck");
+// Map health check endpoints
+app.MapHealthChecks("/health");
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = (check) => check.Tags.Contains("ready")
+});
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = (check) => check.Tags.Contains("live")
+});
+
+// Database migration (run on startup in development)
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+
+    try
+    {
+        // Apply any pending migrations
+        await dbContext.Database.MigrateAsync();
+        Console.WriteLine("Database migrations applied successfully");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Database migration failed: {ex.Message}");
+    }
+}
 
 app.Run();

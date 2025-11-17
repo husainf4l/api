@@ -1,5 +1,5 @@
+using AuthService.Models.Entities;
 using Microsoft.EntityFrameworkCore;
-using AuthService.Models;
 
 namespace AuthService.Data;
 
@@ -8,129 +8,87 @@ public class AuthDbContext : DbContext
     public AuthDbContext(DbContextOptions<AuthDbContext> options) : base(options)
     {
     }
-    
-    public DbSet<User> Users { get; set; }
-    public DbSet<RefreshToken> RefreshTokens { get; set; }
-    public DbSet<CorsOrigin> CorsOrigins { get; set; }
-    public DbSet<PasswordHistory> PasswordHistories { get; set; }
+
+    // DbSets for all entities
     public DbSet<Application> Applications { get; set; }
-    public DbSet<UserSession> UserSessions { get; set; }
+    public DbSet<User> Users { get; set; }
+    public DbSet<Role> Roles { get; set; }
+    public DbSet<UserRole> UserRoles { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
+    public DbSet<SessionLog> SessionLogs { get; set; }
     public DbSet<ApiKey> ApiKeys { get; set; }
-    
+    public DbSet<EmailToken> EmailTokens { get; set; }
+    public DbSet<UserExternalLogin> UserExternalLogins { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        
-        // User configuration
-        modelBuilder.Entity<User>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.Email).IsUnique();
-            entity.Property(e => e.Email).IsRequired().HasMaxLength(255);
-            entity.Property(e => e.PasswordHash).IsRequired();
-            entity.Property(e => e.FirstName).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.LastName).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("NOW()");
-        });
-        
-        // RefreshToken configuration
-        modelBuilder.Entity<RefreshToken>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.TokenHash).IsUnique();
-            entity.Property(e => e.TokenHash).IsRequired();
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("NOW()");
-            
-            entity.HasOne(e => e.User)
-                .WithMany(u => u.RefreshTokens)
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasOne(e => e.Application)
-                .WithMany()
-                .HasForeignKey(e => e.ApplicationId)
-                .OnDelete(DeleteBehavior.SetNull);
-        });
+        // Configure composite primary key for UserRole
+        modelBuilder.Entity<UserRole>()
+            .HasKey(ur => new { ur.UserId, ur.RoleId });
 
-        // CorsOrigin configuration
-        modelBuilder.Entity<CorsOrigin>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.Origin).IsUnique();
-            entity.Property(e => e.Origin).IsRequired().HasMaxLength(512);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("NOW()");
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
-        });
+        // Configure relationships
+        modelBuilder.Entity<UserRole>()
+            .HasOne(ur => ur.User)
+            .WithMany(u => u.UserRoles)
+            .HasForeignKey(ur => ur.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
 
-        // PasswordHistory configuration
-        modelBuilder.Entity<PasswordHistory>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.PasswordHash).IsRequired();
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("NOW()");
+        modelBuilder.Entity<UserRole>()
+            .HasOne(ur => ur.Role)
+            .WithMany(r => r.UserRoles)
+            .HasForeignKey(ur => ur.RoleId)
+            .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasOne(e => e.User)
-                .WithMany(u => u.PasswordHistory)
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
+        // Configure indexes for better performance
+        modelBuilder.Entity<Application>()
+            .HasIndex(a => a.Code)
+            .IsUnique();
 
-        // Application configuration
-        modelBuilder.Entity<Application>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.ClientId).IsUnique();
-            entity.Property(e => e.Name).IsRequired().HasMaxLength(255);
-            entity.Property(e => e.ClientId).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.ClientSecret).IsRequired();
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("NOW()");
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
-        });
+        modelBuilder.Entity<User>()
+            .HasIndex(u => new { u.ApplicationId, u.NormalizedEmail })
+            .IsUnique();
 
-        // UserSession configuration
-        modelBuilder.Entity<UserSession>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.IpAddress).IsRequired().HasMaxLength(45);
-            entity.Property(e => e.LoginAt).HasDefaultValueSql("NOW()");
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.NormalizedEmail);
 
-            entity.HasOne(e => e.User)
-                .WithMany()
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<Role>()
+            .HasIndex(r => new { r.ApplicationId, r.Name })
+            .IsUnique();
 
-            entity.HasOne(e => e.Application)
-                .WithMany(a => a.UserSessions)
-                .HasForeignKey(e => e.ApplicationId)
-                .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<RefreshToken>()
+            .HasIndex(rt => rt.Token)
+            .IsUnique();
 
-            entity.HasIndex(e => new { e.UserId, e.ApplicationId, e.IsActive });
-        });
+        modelBuilder.Entity<RefreshToken>()
+            .HasIndex(rt => new { rt.UserId, rt.ApplicationId });
 
-        // ApiKey configuration
-        modelBuilder.Entity<ApiKey>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.KeyHash).IsUnique();
-            entity.Property(e => e.Name).IsRequired().HasMaxLength(255);
-            entity.Property(e => e.KeyPrefix).IsRequired().HasMaxLength(50);
-            entity.Property(e => e.KeyHash).IsRequired();
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("NOW()");
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
-            entity.Property(e => e.IsRevoked).HasDefaultValue(false);
+        // Configure table names (optional, EF will pluralize automatically)
+        modelBuilder.Entity<Application>().ToTable("Applications");
+        modelBuilder.Entity<User>().ToTable("Users");
+        modelBuilder.Entity<Role>().ToTable("Roles");
+        modelBuilder.Entity<UserRole>().ToTable("UserRoles");
+        modelBuilder.Entity<RefreshToken>().ToTable("RefreshTokens");
+        modelBuilder.Entity<SessionLog>().ToTable("SessionLogs");
+        modelBuilder.Entity<ApiKey>().ToTable("ApiKeys");
+        modelBuilder.Entity<EmailToken>().ToTable("EmailTokens");
+        modelBuilder.Entity<UserExternalLogin>().ToTable("UserExternalLogins");
 
-            entity.HasOne(e => e.User)
-                .WithMany()
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
+        // Configure EmailToken indexes
+        modelBuilder.Entity<EmailToken>()
+            .HasIndex(et => et.Token)
+            .IsUnique();
 
-            entity.HasOne(e => e.Application)
-                .WithMany()
-                .HasForeignKey(e => e.ApplicationId)
-                .OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<EmailToken>()
+            .HasIndex(et => new { et.UserId, et.TokenType, et.IsUsed });
 
-            entity.HasIndex(e => new { e.UserId, e.IsActive, e.IsRevoked });
-        });
+        // Configure UserExternalLogin indexes
+        modelBuilder.Entity<UserExternalLogin>()
+            .HasIndex(uel => new { uel.Provider, uel.ProviderUserId })
+            .IsUnique();
+
+        modelBuilder.Entity<UserExternalLogin>()
+            .HasIndex(uel => uel.UserId);
     }
 }
