@@ -1,18 +1,20 @@
 # EmailService
 
-A production-ready microservice for sending emails via AWS SES (Simple Email Service) with PostgreSQL persistence, API key authentication, and Docker deployment.
+A production-ready microservice for sending emails via AWS SES (Simple Email Service) with GraphQL API, PostgreSQL persistence, API key authentication, and Docker deployment.
 
 ## 🚀 Features
 
+- **GraphQL API**: Modern GraphQL interface for email operations
 - **AWS SES Integration**: Send emails using Amazon Simple Email Service
 - **API Key Authentication**: Secure endpoints with X-API-Key header validation
 - **PostgreSQL Database**: Log all emails, manage templates, and track API keys
 - **Docker Support**: Fully containerized with docker-compose
-- **Health Monitoring**: Health check endpoint for monitoring
+- **Health Monitoring**: Health check query for monitoring
 - **Email Logging**: Track all sent emails with success/failure status
 - **Template Management**: Store and reuse email templates
 - **Multiple Recipients**: Support for To, CC, and BCC
 - **HTML & Plain Text**: Support for both HTML and plain text emails
+- **HTML Template Generator**: Built-in HTML email template generation
 
 ## 📋 Prerequisites
 
@@ -24,11 +26,6 @@ A production-ready microservice for sending emails via AWS SES (Simple Email Ser
 
 ```
 EmailService/
-├── .docker/                    # Docker configuration
-│   ├── Dockerfile             # Multi-stage Docker build
-│   └── docker-compose.yml     # Service orchestration
-├── Controllers/               # API endpoints
-│   └── EmailController.cs     # Email & health endpoints
 ├── Data/                      # Database context
 │   └── EmailDbContext.cs      # EF Core DbContext
 ├── docs/                      # Documentation
@@ -36,9 +33,16 @@ EmailService/
 │   ├── DOCKER_DEPLOYMENT.md
 │   ├── EMAIL_API_DOCUMENTATION.md
 │   └── QUICK_START.md
-├── DTOs/                      # Data transfer objects
-│   ├── EmailResponse.cs
-│   └── SendEmailRequest.cs
+├── GraphQL/                   # GraphQL schema
+│   ├── EmailMutations.cs      # Mutations (sendEmail, generateHtml)
+│   ├── EmailQueries.cs        # Queries (health)
+│   ├── GraphQLAuthInterceptor.cs  # API key authentication
+│   └── Types/                 # GraphQL types
+│       ├── EmailResult.cs
+│       ├── GenerateHtmlInput.cs
+│       ├── GenerateHtmlResult.cs
+│       ├── HealthResult.cs
+│       └── SendEmailInput.cs
 ├── Middleware/                # Custom middleware
 │   └── ApiKeyAuthMiddleware.cs
 ├── Migrations/                # Database migrations
@@ -51,6 +55,8 @@ EmailService/
 │   └── AwsSesEmailService.cs  # Email service implementation
 ├── .env                       # Environment variables (not in git)
 ├── appsettings.json           # Application configuration
+├── docker-compose.yml         # Docker orchestration
+├── Dockerfile                 # Container definition
 ├── Program.cs                 # Application entry point
 └── README.md                  # This file
 ```
@@ -72,70 +78,119 @@ ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=emailservi
 ### 2. Start Services
 
 ```bash
-cd /home/husain/api/EmailService/.docker
 docker-compose up -d
 ```
 
 ### 3. Verify Health
 
 ```bash
-curl http://localhost:5102/api/email/health
+curl -X POST http://localhost:5189/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ health { status service timestamp } }"}'
 ```
 
 Expected response:
 ```json
-{"status":"Email service is healthy"}
+{
+  "data": {
+    "health": {
+      "status": "healthy",
+      "service": "EmailService",
+      "timestamp": "2025-11-17T12:00:00.0000000Z"
+    }
+  }
+}
 ```
 
 ### 4. Send an Email
 
 ```bash
-curl -X POST http://localhost:5102/api/email/send \
+curl -X POST http://localhost:5189/graphql \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secure-api-key" \
   -d '{
-    "from": "noreply@aqlaan.com",
-    "to": ["recipient@example.com"],
-    "subject": "Test Email",
-    "body": "Hello from EmailService!",
-    "isHtml": false
+    "query": "mutation SendEmail($input: SendEmailInput!) { sendEmail(input: $input) { success message messageId } }",
+    "variables": {
+      "input": {
+        "to": "recipient@example.com",
+        "subject": "Test Email",
+        "body": "Hello from EmailService!",
+        "isHtml": false
+      }
+    }
   }'
 ```
 
-## 📡 API Endpoints
+## 📡 GraphQL API
 
-### Health Check
-```http
-GET /api/email/health
+### Endpoint
 ```
-No authentication required.
-
-### Send Email
-```http
-POST /api/email/send
-Content-Type: application/json
-X-API-Key: your-api-key
+POST http://localhost:5189/graphql
 ```
 
-**Request Body:**
-```json
-{
-  "from": "sender@domain.com",
-  "to": ["recipient@example.com"],
-  "cc": ["cc@example.com"],          // Optional
-  "bcc": ["bcc@example.com"],        // Optional
-  "subject": "Email Subject",
-  "body": "Email body content",
-  "isHtml": false
+### Queries
+
+#### Health Check
+```graphql
+query {
+  health {
+    status
+    service
+    timestamp
+  }
 }
 ```
 
-**Response:**
+### Mutations
+
+#### Send Email
+```graphql
+mutation SendEmail($input: SendEmailInput!) {
+  sendEmail(input: $input) {
+    success
+    message
+    messageId
+  }
+}
+```
+
+**Variables:**
 ```json
 {
-  "success": true,
-  "message": "Email sent successfully",
-  "messageId": "011d019a9224c2c1-..."
+  "input": {
+    "to": "recipient@example.com",
+    "cc": "optional@example.com",
+    "bcc": "optional@example.com",
+    "subject": "Email Subject",
+    "body": "Email body or HTML content",
+    "isHtml": false
+  }
+}
+```
+
+#### Generate HTML Template
+```graphql
+mutation GenerateHtml($input: GenerateHtmlInput!) {
+  generateHtml(input: $input) {
+    success
+    html
+    message
+  }
+}
+```
+
+**Variables:**
+```json
+{
+  "input": {
+    "title": "Welcome Email",
+    "heading": "Welcome to Our Service!",
+    "message": "Thank you for joining us.",
+    "buttonText": "Get Started",
+    "buttonUrl": "https://example.com",
+    "additionalInfo": "Additional information here",
+    "footerText": "Best regards, Our Team"
+  }
 }
 ```
 
@@ -152,7 +207,8 @@ Manages API keys with usage tracking.
 
 ## 🔒 Security
 
-- **API Key Authentication**: All email endpoints require valid X-API-Key header
+- **API Key Authentication**: All mutations require valid X-API-Key header
+- **GraphQL Authorization**: Built-in authorization via GraphQLAuthInterceptor
 - **Environment Variables**: Sensitive credentials stored in .env (excluded from git)
 - **AWS SES Sandbox**: Requires verified email addresses until production access granted
 - **Database Logging**: Full audit trail of all email operations
@@ -161,7 +217,7 @@ Manages API keys with usage tracking.
 
 ```bash
 # Start services
-cd .docker && docker-compose up -d
+docker-compose up -d
 
 # Stop services
 docker-compose down
@@ -180,7 +236,7 @@ docker-compose ps
 
 - [API Key Documentation](docs/API_KEY_DOCUMENTATION.md)
 - [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md)
-- [Email API Documentation](docs/EMAIL_API_DOCUMENTATION.md)
+- [Email API Documentation](docs/EMAIL_API_DOCUMENTATION.md) - Full GraphQL reference
 - [Quick Start Guide](docs/QUICK_START.md)
 
 ## 🛠️ Development
@@ -200,14 +256,17 @@ dotnet ef database update
 dotnet run
 ```
 
-The service will be available at `http://localhost:5189`
+The service will be available at:
+- GraphQL endpoint: `http://localhost:5189/graphql`
+- GraphQL Playground (dev): `http://localhost:5189/ui/playground`
 
 ### Adding New Features
 
 1. Create models in `Models/`
 2. Add business logic in `Services/`
-3. Expose via controllers in `Controllers/`
-4. Update database schema in `Migrations/`
+3. Add GraphQL types in `GraphQL/Types/`
+4. Expose via queries/mutations in `GraphQL/`
+5. Update database schema in `Migrations/`
 
 ## 🔧 Configuration
 
@@ -227,7 +286,7 @@ PostgreSQL is automatically initialized with the schema in `Migrations/init.sql`
 
 ## 📊 Monitoring
 
-- **Health Endpoint**: `/api/email/health` for uptime checks
+- **Health Query**: GraphQL health query for uptime checks
 - **Database Logs**: Query `email_logs` table for delivery status
 - **API Key Usage**: Track usage via `api_keys` table
 - **Docker Logs**: `docker-compose logs -f emailservice`
@@ -249,6 +308,11 @@ docker-compose up -d --build
 - Ensure postgres container is healthy: `docker-compose ps`
 - Check connection string in .env
 
+### GraphQL errors
+- Check X-API-Key header is present for mutations
+- Verify query syntax in GraphQL Playground
+- Review error messages in GraphQL response
+
 ## 📝 License
 
 Private - Internal Use Only
@@ -259,4 +323,4 @@ For questions or support, contact the development team.
 
 ---
 
-**Built with**: ASP.NET Core 10.0 | AWS SES | PostgreSQL 17 | Docker
+**Built with**: ASP.NET Core 10.0 | GraphQL (HotChocolate) | AWS SES | PostgreSQL 17 | Docker

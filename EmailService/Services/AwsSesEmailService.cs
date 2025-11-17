@@ -1,6 +1,6 @@
 using Amazon.SimpleEmail;
 using Amazon.SimpleEmail.Model;
-using EmailService.DTOs;
+using EmailService.GraphQL.Types;
 using EmailService.Data;
 using EmailService.Models;
 
@@ -8,20 +8,20 @@ namespace EmailService.Services
 {
     public interface IEmailService
     {
-        Task<EmailResponse> SendEmailAsync(DTOs.SendEmailRequest request);
+        Task<EmailResult> SendEmailAsync(SendEmailInput request);
     }
 
     public class AwsSesEmailService : IEmailService
     {
         private readonly IAmazonSimpleEmailService _sesClient;
         private readonly ILogger<AwsSesEmailService> _logger;
-        private readonly EmailDbContext _dbContext;
+        private readonly EmailDbContext? _dbContext;
         private readonly string _fromEmail;
 
         public AwsSesEmailService(
-            IAmazonSimpleEmailService sesClient, 
-            ILogger<AwsSesEmailService> logger, 
-            EmailDbContext dbContext,
+            IAmazonSimpleEmailService sesClient,
+            ILogger<AwsSesEmailService> logger,
+            EmailDbContext? dbContext,
             IConfiguration configuration)
         {
             _sesClient = sesClient;
@@ -30,19 +30,8 @@ namespace EmailService.Services
             _fromEmail = configuration["EmailSettings:FromEmail"] ?? "noreply@example.com";
         }
 
-        public async Task<EmailResponse> SendEmailAsync(DTOs.SendEmailRequest request)
+        public async Task<EmailResult> SendEmailAsync(SendEmailInput request)
         {
-            var emailLog = new EmailLog
-            {
-                To = request.To,
-                Cc = request.Cc,
-                Bcc = request.Bcc,
-                Subject = request.Subject,
-                Body = request.Body,
-                IsHtml = request.IsHtml,
-                SentAt = DateTime.UtcNow
-            };
-
             try
             {
                 var sendRequest = new Amazon.SimpleEmail.Model.SendEmailRequest
@@ -79,15 +68,27 @@ namespace EmailService.Services
 
                 _logger.LogInformation($"Email sent successfully to {request.To}. MessageId: {response.MessageId}");
 
-                // Update log with success
-                emailLog.Success = true;
-                emailLog.MessageId = response.MessageId;
+                // Log to database if available
+                if (_dbContext != null)
+                {
+                    var emailLog = new EmailLog
+                    {
+                        To = request.To,
+                        Cc = request.Cc,
+                        Bcc = request.Bcc,
+                        Subject = request.Subject,
+                        Body = request.Body,
+                        IsHtml = request.IsHtml,
+                        SentAt = DateTime.UtcNow,
+                        Success = true,
+                        MessageId = response.MessageId
+                    };
 
-                // Save to database
-                _dbContext.EmailLogs.Add(emailLog);
-                await _dbContext.SaveChangesAsync();
+                    _dbContext.EmailLogs.Add(emailLog);
+                    await _dbContext.SaveChangesAsync();
+                }
 
-                return new EmailResponse
+                return new EmailResult
                 {
                     Success = true,
                     Message = "Email sent successfully",
@@ -98,15 +99,27 @@ namespace EmailService.Services
             {
                 _logger.LogError($"Error sending email: {ex.Message}");
 
-                // Update log with failure
-                emailLog.Success = false;
-                emailLog.ErrorMessage = ex.Message;
+                // Log to database if available
+                if (_dbContext != null)
+                {
+                    var emailLog = new EmailLog
+                    {
+                        To = request.To,
+                        Cc = request.Cc,
+                        Bcc = request.Bcc,
+                        Subject = request.Subject,
+                        Body = request.Body,
+                        IsHtml = request.IsHtml,
+                        SentAt = DateTime.UtcNow,
+                        Success = false,
+                        ErrorMessage = ex.Message
+                    };
 
-                // Save to database
-                _dbContext.EmailLogs.Add(emailLog);
-                await _dbContext.SaveChangesAsync();
+                    _dbContext.EmailLogs.Add(emailLog);
+                    await _dbContext.SaveChangesAsync();
+                }
 
-                return new EmailResponse
+                return new EmailResult
                 {
                     Success = false,
                     Message = $"Failed to send email: {ex.Message}"

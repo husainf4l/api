@@ -1,47 +1,132 @@
-@EmailService_HostAddress = http://localhost:5189
+@EmailService_GraphQL = http://localhost:5189/graphql
+@ApiKey = dev-email-service-key-2024
 
-### Health Check
-GET {{EmailService_HostAddress}}/api/email/health
+### Health Check (No Auth Required)
+POST {{EmailService_GraphQL}}
+Content-Type: application/json
+
+{
+  "query": "{ health { status service timestamp } }"
+}
 
 ###
 
 ### Send Plain Text Email
-POST {{EmailService_HostAddress}}/api/email/send
+POST {{EmailService_GraphQL}}
 Content-Type: application/json
+X-API-Key: {{ApiKey}}
 
 {
-  "to": "husain.f4l@gmail.com",
-  "subject": "Hello World",
-  "body": "Hello World",
-  "isHtml": false
+  "query": "mutation SendEmail($input: SendEmailInput!) { sendEmail(input: $input) { success message messageId } }",
+  "variables": {
+    "input": {
+      "to": "husain.f4l@gmail.com",
+      "subject": "Hello World",
+      "body": "Hello World from GraphQL!",
+      "isHtml": false
+    }
+  }
 }
 
 ###
 
 ### Send HTML Email
-POST {{EmailService_HostAddress}}/api/email/send
+POST {{EmailService_GraphQL}}
 Content-Type: application/json
+X-API-Key: {{ApiKey}}
 
 {
-  "to": "husain.f4l@gmail.com",
-  "subject": "Welcome to EmailService",
-  "body": "<h1>Welcome!</h1><p>This is a <strong>formatted</strong> HTML email from the EmailService.</p>",
-  "isHtml": true
+  "query": "mutation SendEmail($input: SendEmailInput!) { sendEmail(input: $input) { success message messageId } }",
+  "variables": {
+    "input": {
+      "to": "husain.f4l@gmail.com",
+      "subject": "Welcome to EmailService",
+      "body": "<h1>Welcome!</h1><p>This is a <strong>formatted</strong> HTML email from the EmailService GraphQL API.</p>",
+      "isHtml": true
+    }
+  }
 }
 
 ###
 
 ### Send Email with CC and BCC
-POST {{EmailService_HostAddress}}/api/email/send
+POST {{EmailService_GraphQL}}
 Content-Type: application/json
+X-API-Key: {{ApiKey}}
 
 {
-  "to": "husain.f4l@gmail.com",
-  "cc": "admin@rolevate.com",
-  "bcc": "info@aqlaan.com",
-  "subject": "Team Notification",
-  "body": "This email has been sent to multiple recipients.",
-  "isHtml": false
+  "query": "mutation SendEmail($input: SendEmailInput!) { sendEmail(input: $input) { success message messageId } }",
+  "variables": {
+    "input": {
+      "to": "husain.f4l@gmail.com",
+      "cc": "admin@rolevate.com",
+      "bcc": "info@aqlaan.com",
+      "subject": "Team Notification",
+      "body": "This email has been sent to multiple recipients.",
+      "isHtml": false
+    }
+  }
 }
+
+###
+
+### Generate HTML Email Template
+POST {{EmailService_GraphQL}}
+Content-Type: application/json
+X-API-Key: {{ApiKey}}
+
+{
+  "query": "mutation GenerateHtml($input: GenerateHtmlInput!) { generateHtml(input: $input) { success html message } }",
+  "variables": {
+    "input": {
+      "title": "Welcome to Our Service",
+      "heading": "Welcome Aboard!",
+      "message": "We're excited to have you join our community. Get started by exploring our features.",
+      "buttonText": "Get Started",
+      "buttonUrl": "https://example.com/get-started",
+      "additionalInfo": "If you have any questions, feel free to reach out to our support team.",
+      "footerText": "Best regards, The EmailService Team"
+    }
+  }
+}
+
+###
+
+### Generate and Send HTML Email (Two Steps)
+# Step 1: Generate HTML
+POST {{EmailService_GraphQL}}
+Content-Type: application/json
+X-API-Key: {{ApiKey}}
+
+{
+  "query": "mutation GenerateHtml($input: GenerateHtmlInput!) { generateHtml(input: $input) { success html message } }",
+  "variables": {
+    "input": {
+      "title": "Account Verification",
+      "heading": "Verify Your Email",
+      "message": "Please verify your email address to complete your registration.",
+      "buttonText": "Verify Email",
+      "buttonUrl": "https://example.com/verify?token=abc123",
+      "footerText": "Thank you for joining us!"
+    }
+  }
+}
+
+# Step 2: Copy the HTML from above response and send as email
+# POST {{EmailService_GraphQL}}
+# Content-Type: application/json
+# X-API-Key: {{ApiKey}}
+# 
+# {
+#   "query": "mutation SendEmail($input: SendEmailInput!) { sendEmail(input: $input) { success message messageId } }",
+#   "variables": {
+#     "input": {
+#       "to": "husain.f4l@gmail.com",
+#       "subject": "Verify Your Email",
+#       "body": "<!-- paste generated HTML here -->",
+#       "isHtml": true
+#     }
+#   }
+# }
 
 ###
