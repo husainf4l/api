@@ -1,12 +1,16 @@
-using SmsService.Middleware;
 using SmsService.Services;
+using SmsService.Repositories;
+using SmsService.GraphQL.Queries;
+using SmsService.GraphQL.Mutations;
+using SmsService.GraphQL.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddOpenApi();
+builder.Services.AddHttpContextAccessor();
+
+// Register SMS repository
+builder.Services.AddScoped<SmsMessageRepository>();
 
 // Register HttpClient for SMS service
 builder.Services.AddHttpClient<ISmsService, JosmsSmsService>();
@@ -14,20 +18,19 @@ builder.Services.AddHttpClient<ISmsService, JosmsSmsService>();
 // Register SMS service
 builder.Services.AddScoped<ISmsService, JosmsSmsService>();
 
+// Add GraphQL
+builder.Services
+    .AddGraphQLServer()
+    .AddQueryType<SmsQueries>()
+    .AddMutationType<SmsMutations>()
+    .UseField<ApiKeyAuthorizationMiddleware>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
-// Add API Key authentication middleware
-app.UseMiddleware<ApiKeyAuthMiddleware>();
-
 app.UseHttpsRedirection();
-app.UseAuthorization();
 
-app.MapControllers();
+// Map GraphQL endpoint
+app.MapGraphQL("/graphql");
 
 app.Run();

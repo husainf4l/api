@@ -1,0 +1,61 @@
+# Docker ignore patterns
+
+# Build artifacts
+bin/
+obj/
+out/
+publish/
+
+# Development files
+*.user
+*.suo
+*.userprefs
+.vs/
+.vscode/
+.idea/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Test results
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# Logs
+*.log
+logs/
+sms.log
+
+# Environment files (will be set via docker-compose)
+.env
+.env.local
+.env.production
+
+# Database
+*.db
+*.sqlite
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation (keep README)
+*.md
+!README.md
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore

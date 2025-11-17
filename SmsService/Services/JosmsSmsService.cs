@@ -1,15 +1,18 @@
 using System.Net;
 using System.Web;
-using SmsService.DTOs;
+using SmsService.Models;
+using SmsService.Repositories;
+using Microsoft.AspNetCore.Http;
 
 namespace SmsService.Services;
 
 public interface ISmsService
 {
     Task<BalanceResponse> GetBalanceAsync();
-    Task<SmsResponse> SendOtpAsync(string to, string message, string? senderId = null);
-    Task<SmsResponse> SendGeneralAsync(string to, string message, string? senderId = null);
-    Task<SmsResponse> SendBulkAsync(List<string> numbers, string message, string? senderId = null);
+    List<string> GetAvailableSenders();
+    Task<SmsResponse> SendOtpAsync(string to, string message, string? senderId, HttpContext? context);
+    Task<SmsResponse> SendGeneralAsync(string to, string message, string? senderId, HttpContext? context);
+    Task<SmsResponse> SendBulkAsync(List<string> numbers, string message, string? senderId, HttpContext? context);
 }
 
 public class JosmsSmsService : ISmsService
@@ -17,6 +20,7 @@ public class JosmsSmsService : ISmsService
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
     private readonly ILogger<JosmsSmsService> _logger;
+    private readonly SmsMessageRepository _repository;
     private readonly string _baseUrl;
     private readonly string _accName;
     private readonly string _accPassword;
@@ -25,16 +29,50 @@ public class JosmsSmsService : ISmsService
     public JosmsSmsService(
         HttpClient httpClient,
         IConfiguration configuration,
-        ILogger<JosmsSmsService> logger)
+        ILogger<JosmsSmsService> logger,
+        SmsMessageRepository repository)
     {
         _httpClient = httpClient;
         _configuration = configuration;
         _logger = logger;
+        _repository = repository;
 
         _baseUrl = _configuration["JosmsSettings:BaseUrl"] ?? "https://www.josms.net";
         _accName = _configuration["JosmsSettings:AccName"] ?? throw new Exception("JOSMS AccName not configured");
         _accPassword = _configuration["JosmsSettings:AccPassword"] ?? throw new Exception("JOSMS AccPassword not configured");
         _defaultSenderId = _configuration["JosmsSettings:DefaultSenderId"] ?? "MargoGroup";
+    }
+
+    public List<string> GetAvailableSenders()
+    {
+        // Available senders for MargoGroup account
+        return new List<string>
+        {
+            "MargoGroup"
+            // Add more senders here as they are approved by JOSMS
+        };
+    }
+
+    private (string? ipAddress, string? userAgent, string? apiKey, string? appName, string? appVersion) ExtractContextInfo(HttpContext? context)
+    {
+        if (context == null)
+            return (null, null, null, null, null);
+
+        var ipAddress = context.Connection.RemoteIpAddress?.ToString();
+        var userAgent = context.Request.Headers["User-Agent"].ToString();
+        var apiKey = context.Request.Headers["X-API-Key"].ToString();
+        var appName = context.Request.Headers["X-App-Name"].ToString();
+        var appVersion = context.Request.Headers["X-App-Version"].ToString();
+        
+        // Mask API key for security (show only first 8 chars)
+        if (!string.IsNullOrEmpty(apiKey) && apiKey.Length > 8)
+        {
+            apiKey = apiKey.Substring(0, 8) + "...";
+        }
+
+        return (ipAddress, userAgent, apiKey, 
+                string.IsNullOrEmpty(appName) ? null : appName,
+                string.IsNullOrEmpty(appVersion) ? null : appVersion);
     }
 
     public async Task<BalanceResponse> GetBalanceAsync()
@@ -57,7 +95,7 @@ public class JosmsSmsService : ISmsService
                     {
                         Success = true,
                         Message = "Balance retrieved successfully",
-                        Balance = balance,
+                        Balance = (double)balance,
                         RawResponse = content
                     };
                 }
@@ -89,11 +127,23 @@ public class JosmsSmsService : ISmsService
         }
     }
 
-    public async Task<SmsResponse> SendOtpAsync(string to, string message, string? senderId = null)
+    public async Task<SmsResponse> SendOtpAsync(string to, string message, string? senderId, HttpContext? context)
     {
         try
         {
             var sender = senderId ?? _defaultSenderId;
+            
+            // Validate sender
+            var availableSenders = GetAvailableSenders();
+            if (!availableSenders.Contains(sender))
+            {
+                return new SmsResponse
+                {
+                    Success = false,
+                    Message = $"Invalid sender ID. Available senders: {string.Join(", ", availableSenders)}"
+                };
+            }
+
             var normalizedNumber = NormalizePhoneNumber(to);
 
             if (normalizedNumber == null)
@@ -117,6 +167,36 @@ public class JosmsSmsService : ISmsService
             var response = await _httpClient.GetAsync(url);
             var content = await response.Content.ReadAsStringAsync();
 
+            // Extract MsgID from response
+            string? messageId = null;
+            if (content.Contains("MsgID"))
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(content, @"MsgID\s*=\s*(\d+)");
+                if (match.Success)
+                {
+                    messageId = match.Groups[1].Value;
+                }
+            }
+
+            // Extract context information
+            var (ipAddress, userAgent, apiKey, appName, appVersion) = ExtractContextInfo(context);
+
+            // Save to database
+            await _repository.SaveMessageAsync(new SmsMessage
+            {
+                Recipient = normalizedNumber,
+                Message = message,
+                SenderId = sender,
+                MessageId = messageId,
+                Status = response.IsSuccessStatusCode ? "sent" : "failed",
+                ResponseData = content,
+                IpAddress = ipAddress,
+                UserAgent = userAgent,
+                ApiKeyUsed = apiKey,
+                AppName = appName,
+                AppVersion = appVersion
+            });
+
             return new SmsResponse
             {
                 Success = response.IsSuccessStatusCode,
@@ -135,11 +215,23 @@ public class JosmsSmsService : ISmsService
         }
     }
 
-    public async Task<SmsResponse> SendGeneralAsync(string to, string message, string? senderId = null)
+    public async Task<SmsResponse> SendGeneralAsync(string to, string message, string? senderId, HttpContext? context)
     {
         try
         {
             var sender = senderId ?? _defaultSenderId;
+            
+            // Validate sender
+            var availableSenders = GetAvailableSenders();
+            if (!availableSenders.Contains(sender))
+            {
+                return new SmsResponse
+                {
+                    Success = false,
+                    Message = $"Invalid sender ID. Available senders: {string.Join(", ", availableSenders)}"
+                };
+            }
+
             var normalizedNumber = NormalizePhoneNumber(to);
 
             if (normalizedNumber == null)
@@ -163,6 +255,36 @@ public class JosmsSmsService : ISmsService
             var response = await _httpClient.GetAsync(url);
             var content = await response.Content.ReadAsStringAsync();
 
+            // Extract MsgID from response
+            string? messageId = null;
+            if (content.Contains("MsgID"))
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(content, @"MsgID\s*=\s*(\d+)");
+                if (match.Success)
+                {
+                    messageId = match.Groups[1].Value;
+                }
+            }
+
+            // Extract context information
+            var (ipAddress, userAgent, apiKey, appName, appVersion) = ExtractContextInfo(context);
+
+            // Save to database
+            await _repository.SaveMessageAsync(new SmsMessage
+            {
+                Recipient = normalizedNumber,
+                Message = message,
+                SenderId = sender,
+                MessageId = messageId,
+                Status = response.IsSuccessStatusCode ? "sent" : "failed",
+                ResponseData = content,
+                IpAddress = ipAddress,
+                UserAgent = userAgent,
+                ApiKeyUsed = apiKey,
+                AppName = appName,
+                AppVersion = appVersion
+            });
+
             return new SmsResponse
             {
                 Success = response.IsSuccessStatusCode,
@@ -181,7 +303,7 @@ public class JosmsSmsService : ISmsService
         }
     }
 
-    public async Task<SmsResponse> SendBulkAsync(List<string> numbers, string message, string? senderId = null)
+    public async Task<SmsResponse> SendBulkAsync(List<string> numbers, string message, string? senderId, HttpContext? context)
     {
         try
         {
@@ -195,6 +317,18 @@ public class JosmsSmsService : ISmsService
             }
 
             var sender = senderId ?? _defaultSenderId;
+            
+            // Validate sender
+            var availableSenders = GetAvailableSenders();
+            if (!availableSenders.Contains(sender))
+            {
+                return new SmsResponse
+                {
+                    Success = false,
+                    Message = $"Invalid sender ID. Available senders: {string.Join(", ", availableSenders)}"
+                };
+            }
+
             var normalizedNumbers = numbers
                 .Select(NormalizePhoneNumber)
                 .Where(n => n != null)
@@ -222,6 +356,31 @@ public class JosmsSmsService : ISmsService
 
             var response = await _httpClient.GetAsync(url);
             var content = await response.Content.ReadAsStringAsync();
+
+            // Extract context information
+            var (ipAddress, userAgent, apiKey, appName, appVersion) = ExtractContextInfo(context);
+
+            // Save each message to database
+            foreach (var number in normalizedNumbers)
+            {
+                if (number != null)
+                {
+                    await _repository.SaveMessageAsync(new SmsMessage
+                    {
+                        Recipient = number,
+                        Message = message,
+                        SenderId = sender,
+                        MessageId = null, // Bulk messages don't return individual IDs
+                        Status = response.IsSuccessStatusCode ? "sent" : "failed",
+                        ResponseData = content,
+                        IpAddress = ipAddress,
+                        UserAgent = userAgent,
+                        ApiKeyUsed = apiKey,
+                        AppName = appName,
+                        AppVersion = appVersion
+                    });
+                }
+            }
 
             return new SmsResponse
             {

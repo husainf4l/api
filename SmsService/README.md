@@ -10,7 +10,9 @@ A production-ready microservice for sending SMS messages via JOSMS Gateway with 
   - OTP Messages (One-Time Passwords)
   - General Messages (Announcements, notifications)
   - Bulk Messages (Up to 120 recipients)
+- **Message Tracking**: Save all sent messages with sender information
 - **Balance Checking**: Query remaining SMS credits
+- **Sender Selection**: Choose from approved sender IDs
 - **Phone Number Validation**: Automatic normalization for Jordanian numbers (962)
 - **Health Monitoring**: Health check endpoint
 
@@ -18,6 +20,7 @@ A production-ready microservice for sending SMS messages via JOSMS Gateway with 
 
 - .NET 10.0 SDK
 - JOSMS Account credentials
+- PostgreSQL Database (for message history)
 
 ## 🏗️ Project Structure
 
@@ -99,7 +102,14 @@ X-API-Key: your-api-key
 POST /api/sms/send/otp
 Content-Type: application/json
 X-API-Key: your-api-key
+X-App-Name: YourAppName (optional)
+X-App-Version: 1.0.0 (optional)
 ```
+
+**Request Headers:**
+- `X-API-Key`: Required - Your API key
+- `X-App-Name`: Optional - Application name for tracking
+- `X-App-Version`: Optional - Application version for tracking
 
 **Request Body:**
 ```json
@@ -124,6 +134,8 @@ X-API-Key: your-api-key
 POST /api/sms/send/general
 Content-Type: application/json
 X-API-Key: your-api-key
+X-App-Name: YourAppName (optional)
+X-App-Version: 1.0.0 (optional)
 ```
 
 **Request Body:**
@@ -140,6 +152,8 @@ X-API-Key: your-api-key
 POST /api/sms/send/bulk
 Content-Type: application/json
 X-API-Key: your-api-key
+X-App-Name: YourAppName (optional)
+X-App-Version: 1.0.0 (optional)
 ```
 
 **Request Body:**
@@ -201,19 +215,23 @@ The service automatically normalizes Jordanian phone numbers. Supported formats:
 ### Using curl
 
 ```bash
-# OTP SMS
+# OTP SMS with app tracking
 curl -X POST http://localhost:5000/api/sms/send/otp \
   -H "Content-Type: application/json" \
   -H "X-API-Key: dev-sms-service-key-2024" \
+  -H "X-App-Name: MyCustomerPortal" \
+  -H "X-App-Version: 2.1.5" \
   -d '{
     "to": "0775444418",
     "message": "Your verification code is: 123456"
   }'
 
-# Bulk SMS
+# Bulk SMS with app tracking
 curl -X POST http://localhost:5000/api/sms/send/bulk \
   -H "Content-Type: application/json" \
   -H "X-API-Key: dev-sms-service-key-2024" \
+  -H "X-App-Name: MarketingCampaigns" \
+  -H "X-App-Version: 1.3.0" \
   -d '{
     "to": ["0775444418", "0786543210"],
     "message": "Important announcement!"
@@ -235,7 +253,58 @@ curl -X POST http://localhost:5000/api/sms/send/bulk \
 }
 ```
 
-## 🚨 Error Handling
+## � Message History Endpoints
+
+### Get All Recent Messages
+```bash
+curl -X GET "http://localhost:5103/api/sms/history?limit=100" \
+  -H "X-API-Key: your-api-key"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "count": 3,
+  "messages": [
+    {
+      "id": 1,
+      "recipient": "962771122003",
+      "message": "Your appointment is confirmed",
+      "senderId": "MargoGroup",
+      "messageId": "59798793",
+      "status": "sent",
+      "createdAt": "2025-11-17T16:47:36.803388Z",
+      "ipAddress": "192.168.1.100",
+      "userAgent": "MyApp/1.0",
+      "apiKeyUsed": "sms-prod...",
+      "appName": "CustomerCRM",
+      "appVersion": "3.2.1"
+    }
+  ]
+}
+```
+
+### Get Messages by Recipient
+```bash
+curl -X GET "http://localhost:5103/api/sms/history/962771122003" \
+  -H "X-API-Key: your-api-key"
+```
+
+**Response includes:**
+- Recipient phone number
+- Message content
+- Sender ID used
+- JOSMS Message ID
+- Status (sent/failed)
+- Timestamp
+- **IP Address** of sender
+- **User Agent** of sender
+- **API Key** used (masked)
+- **App Name** - Application that sent the message
+- **App Version** - Version of the application
+
+## �🚨 Error Handling
 
 **Common Error Responses:**
 
