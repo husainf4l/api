@@ -43,8 +43,6 @@ EmailService/
 │       ├── GenerateHtmlResult.cs
 │       ├── HealthResult.cs
 │       └── SendEmailInput.cs
-├── Middleware/                # Custom middleware
-│   └── ApiKeyAuthMiddleware.cs
 ├── Migrations/                # Database migrations
 │   └── init.sql               # Initial schema
 ├── Models/                    # Domain models

@@ -17,13 +17,13 @@ RUN dotnet publish "EmailService.csproj" -c Release -o /app/publish /p:UseAppHos
 # Use .NET 10.0 runtime for the final image
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
-EXPOSE 5189
+EXPOSE 5102
 
 # Copy published application
 COPY --from=publish /app/publish .
 
 # Set environment variables
-ENV ASPNETCORE_URLS=http://+:5189
+ENV ASPNETCORE_URLS=http://+:5102
 ENV ASPNETCORE_ENVIRONMENT=Production
 
 ENTRYPOINT ["dotnet", "EmailService.dll"]

@@ -1,6 +1,5 @@
 using Amazon.SimpleEmail;
 using EmailService.Services;
-using EmailService.Middleware;
 using EmailService.Data;
 using EmailService.GraphQL;
 using Microsoft.AspNetCore.Builder;
@@ -49,9 +48,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
-// Add API Key authentication middleware
-app.UseMiddleware<ApiKeyAuthMiddleware>();
 
 app.MapGraphQL();
 

@@ -27,7 +27,7 @@ services:
       dockerfile: Dockerfile
     container_name: emailservice
     ports:
-      - "5102:5189"
+      - "5102:5102"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - AWS_ACCESS_KEY_ID=AKIA46ALPORVS4J45A54
