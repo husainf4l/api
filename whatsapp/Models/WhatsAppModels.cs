@@ -1,35 +1,58 @@
+using System.Text.Json.Serialization;
+
 namespace WhatsApp.Models;
 
 public class TemplateResponse
 {
+    [JsonPropertyName("data")]
     public List<TemplateData>? Data { get; set; }
+    
+    [JsonPropertyName("paging")]
     public object? Paging { get; set; }
 }
 
 public class TemplateData
 {
+    [JsonPropertyName("name")]
     public string? Name { get; set; }
+    
+    [JsonPropertyName("language")]
     public string? Language { get; set; }
+    
+    [JsonPropertyName("status")]
     public string? Status { get; set; }
+    
+    [JsonPropertyName("category")]
     public string? Category { get; set; }
+    
+    [JsonPropertyName("id")]
     public string? Id { get; set; }
 }
 
 public class SendMessageResponse
 {
+    [JsonPropertyName("messaging_product")]
     public string? MessagingProduct { get; set; }
+    
+    [JsonPropertyName("contacts")]
     public List<Contact>? Contacts { get; set; }
+    
+    [JsonPropertyName("messages")]
     public List<Message>? Messages { get; set; }
 }
 
 public class Contact
 {
+    [JsonPropertyName("input")]
     public string? Input { get; set; }
+    
+    [JsonPropertyName("wa_id")]
     public string? WaId { get; set; }
 }
 
 public class Message
 {
+    [JsonPropertyName("id")]
     public string? Id { get; set; }
 }
 

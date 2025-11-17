@@ -2,7 +2,33 @@
 
 ## Queries
 
-### List all message templates
+### Get all available templates (for dropdown)
+query GetAvailableTemplates {
+  getAvailableTemplates {
+    type
+    name
+    displayName
+    language
+    description
+    requiresParameters
+    parameterCount
+    parameterDescriptions
+  }
+}
+
+### Get specific template info
+query GetTemplateInfo {
+  getTemplateInfo(templateType: TEMP_PASSWORD) {
+    name
+    displayName
+    description
+    requiresParameters
+    parameterCount
+    parameterDescriptions
+  }
+}
+
+### List all message templates from WhatsApp API
 query ListTemplates {
   listTemplates {
     data {
@@ -23,12 +49,11 @@ query GetTokenInfo {
 
 ## Mutations
 
-### Send a simple template message (hello_world)
-mutation SendHelloWorld {
-  sendTemplateMessage(
+### Send template using ENUM (Recommended - Type Safe)
+mutation SendTemplateWithEnum {
+  sendTemplate(
     to: "1234567890"
-    templateName: "hello_world"
-    language: "en_US"
+    templateType: HELLO_WORLD
   ) {
     messagingProduct
     contacts {
@@ -41,12 +66,28 @@ mutation SendHelloWorld {
   }
 }
 
-### Send template with parameters
-mutation SendTemplateWithParams {
-  sendTemplateMessage(
+### Send temp password template
+mutation SendTempPassword {
+  sendTemplate(
     to: "1234567890"
-    templateName: "cv_received_notification"
-    language: "en"
+    templateType: TEMP_PASSWORD
+    parameters: ["ABC123"]
+  ) {
+    messagingProduct
+    contacts {
+      waId
+    }
+    messages {
+      id
+    }
+  }
+}
+
+### Send CV notification
+mutation SendCvNotification {
+  sendTemplate(
+    to: "1234567890"
+    templateType: CV_RECEIVED_NOTIFICATION
     parameters: ["John Doe"]
   ) {
     contacts {
@@ -58,13 +99,12 @@ mutation SendTemplateWithParams {
   }
 }
 
-### Send template with button parameter (temppassword)
-mutation SendTempPassword {
-  sendTemplateMessage(
+### Send score report
+mutation SendScoreReport {
+  sendTemplate(
     to: "1234567890"
-    templateName: "temppassword"
-    language: "en_US"
-    parameters: ["ABC123"]
+    templateType: SCORE_REPORT
+    parameters: ["95/100"]
   ) {
     contacts {
       waId

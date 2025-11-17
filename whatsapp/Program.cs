@@ -16,7 +16,11 @@ builder.Services.AddSingleton<WhatsAppService>();
 builder.Services
     .AddGraphQLServer()
     .AddQueryType<Query>()
-    .AddMutationType<Mutation>();
+    .AddMutationType<Mutation>()
+    .ModifyOptions(options =>
+    {
+        options.UseXmlDocumentation = false;
+    });
 
 var app = builder.Build();
 

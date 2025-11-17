@@ -6,7 +6,23 @@ namespace WhatsApp.GraphQL;
 public class Query
 {
     /// <summary>
-    /// List all WhatsApp message templates
+    /// Get all available template options (for dropdown/UI)
+    /// </summary>
+    public List<TemplateInfo> GetAvailableTemplates()
+    {
+        return TemplateHelper.GetAllTemplates();
+    }
+
+    /// <summary>
+    /// Get information about a specific template
+    /// </summary>
+    public TemplateInfo GetTemplateInfo(TemplateType templateType)
+    {
+        return TemplateHelper.GetTemplateInfo(templateType);
+    }
+
+    /// <summary>
+    /// List all WhatsApp message templates from API
     /// </summary>
     public async Task<TemplateResponse> ListTemplates([Service] WhatsAppService whatsAppService)
     {
@@ -25,16 +41,21 @@ public class Query
 public class Mutation
 {
     /// <summary>
-    /// Send a template message via WhatsApp
+    /// Send a template message via WhatsApp using template type
     /// </summary>
-    public async Task<SendMessageResponse> SendTemplateMessage(
+    public async Task<SendMessageResponse> SendTemplate(
         string to,
-        string templateName,
-        string? language,
+        TemplateType templateType,
         List<string>? parameters,
         [Service] WhatsAppService whatsAppService)
     {
-        return await whatsAppService.SendTemplateMessageAsync(to, templateName, language, parameters);
+        var templateInfo = TemplateHelper.GetTemplateInfo(templateType);
+        return await whatsAppService.SendTemplateMessageAsync(
+            to, 
+            templateInfo.Name, 
+            templateInfo.Language, 
+            parameters
+        );
     }
 
     /// <summary>
