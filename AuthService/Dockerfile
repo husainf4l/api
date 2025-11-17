@@ -21,15 +21,11 @@ WORKDIR /app
 # Install curl for health checks
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user
-RUN adduser --disabled-password --gecos '' appuser && chown -R appuser:appuser /app
-USER appuser
-
 # Copy the published app
 COPY --from=publish /app/publish .
 
 # Expose the port the app runs on
-EXPOSE 8080
+EXPOSE 5101
 
 # Set the entry point
 ENTRYPOINT ["dotnet", "AuthService.dll"]
