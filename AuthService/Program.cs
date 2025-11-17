@@ -2,7 +2,11 @@ using AuthService.Data;
 using AuthService.Services;
 using AuthService.GraphQL;
 using AuthService.GraphQL.DataLoaders;
+using AuthService.GraphQL.Types;
+using AuthService.GraphQL.Queries;
+using AuthService.GraphQL.Mutations;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -22,31 +26,25 @@ builder.Services
     .AddMutationType<Mutation>()
     .AddType<ApplicationType>()
     .AddType<UserType>()
-    .AddType<RoleType>()
-    .AddType<ApiKeyType>()
-    .AddType<SessionLogType>()
-    .AddType<ApplicationStatsType>()
-    .AddType<TwoFactorSetupResponseType>()
-    .AddType<CreateApiKeyResponseType>()
     .AddType<RegisterRequestInput>()
     .AddType<LoginRequestInput>()
-    .AddType<CreateApplicationRequestInput>()
-    .AddType<CreateApiKeyRequestInput>()
-    .AddType<ValidateApiKeyRequestInput>()
     .AddType<TokenResponseType>()
     .AddType<UserInfoType>()
-    .AddType<ValidateApiKeyResponseType>()
     .AddFiltering()
     .AddSorting()
     .AddProjections();
 
 // Configure Entity Framework with PostgreSQL
-builder.Services.AddDbContext<AuthDbContext>(options =>
-{
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
-    options.ConfigureWarnings(warnings => 
-        warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
-});
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+// Register DbContext using the recommended pattern for both regular DI and DataLoaders
+builder.Services.AddDbContextFactory<AuthDbContext>(options =>
+    options.UseNpgsql(connectionString)
+           .ConfigureWarnings(warnings => 
+               warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
+
+// Add scoped DbContext that uses the factory (for services that need it)
+builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<AuthDbContext>>().CreateDbContext());
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
@@ -89,12 +87,11 @@ builder.Services.AddAuthentication(options =>
 // Add authorization
 builder.Services.AddAuthorization();
 
-// Configure Data Protection - keys will persist in mounted volume
-var keysDirectory = new DirectoryInfo("/root/.aspnet/DataProtection-Keys");
-if (!keysDirectory.Exists)
-{
-    keysDirectory.Create();
-}
+// Configure Data Protection - store keys in app directory
+var keysPath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "DataProtection-Keys");
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(keysPath))
+    .SetApplicationName("AuthService");
 
 // Configure OAuth providers
 builder.Services.AddAuthentication()
@@ -160,7 +157,7 @@ builder.Services.AddAuthentication()
 
 // Add health checks
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<AuthDbContext>("database")
+    .AddCheck<DbContextHealthCheck>("database")
     .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy());
 
 // Register application services
@@ -179,7 +176,6 @@ builder.Services.AddHttpClient();
 // Register data loaders for GraphQL
 builder.Services.AddScoped<ApplicationDataLoader>();
 builder.Services.AddScoped<UserDataLoader>();
-builder.Services.AddScoped<UserRolesDataLoader>();
 
 // Register email service (use console service in development, real service in production)
 if (builder.Environment.IsDevelopment())
@@ -213,8 +209,8 @@ app.UsePathBase("/auth");
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
-    // Enable GraphQL Playground for development
-    app.UseGraphQLPlayground("/graphql");
+    // GraphQL endpoint is available at /auth/graphql
+    // You can use tools like GraphQL Playground, Altair, or Insomnia to test
 }
 
 // HTTPS is handled by reverse proxy (nginx), so we don't need HTTPS redirection

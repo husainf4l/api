@@ -116,6 +116,70 @@ public class ApplicationService
         return applications;
     }
 
+    public async Task<ApplicationDto?> UpdateApplicationAsync(Guid applicationId, string? name, bool? isActive)
+    {
+        try
+        {
+            var application = await _context.Applications.FindAsync(applicationId);
+
+            if (application == null)
+            {
+                _logger.LogWarning("Attempt to update non-existent application: {ApplicationId}", applicationId);
+                return null;
+            }
+
+            // Update fields if provided
+            if (!string.IsNullOrEmpty(name))
+            {
+                application.Name = name;
+            }
+
+            if (isActive.HasValue)
+            {
+                application.IsActive = isActive.Value;
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Application updated successfully: {ApplicationId}", applicationId);
+
+            // Return updated application
+            var applications = await GetAllApplicationsAsync();
+            return applications.FirstOrDefault(a => a.Id == applicationId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating application: {ApplicationId}", applicationId);
+            return null;
+        }
+    }
+
+    public async Task<bool> DeleteApplicationAsync(Guid applicationId)
+    {
+        try
+        {
+            var application = await _context.Applications.FindAsync(applicationId);
+
+            if (application == null)
+            {
+                _logger.LogWarning("Attempt to delete non-existent application: {ApplicationId}", applicationId);
+                return false;
+            }
+
+            // Soft delete - mark as inactive instead of hard delete
+            application.IsActive = false;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Application deleted successfully: {ApplicationId}", applicationId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting application: {ApplicationId}", applicationId);
+            return false;
+        }
+    }
+
     public async Task<bool> ValidateClientCredentialsAsync(string clientId, string clientSecret)
     {
         var application = await _context.Applications

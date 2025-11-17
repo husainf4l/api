@@ -13,13 +13,20 @@ namespace AuthService.GraphQL.Queries;
 
 public class Query
 {
+    // Simple test query to verify GraphQL is working
+    public string Hello(string name = "World")
+    {
+        return $"Hello, {name}!";
+    }
+
     // Applications
     [Authorize]
+    [UsePaging(MaxPageSize = 50, DefaultPageSize = 10, IncludeTotalCount = true)]
     [UseFiltering]
     [UseSorting]
     public IQueryable<Application> GetApplications([Service] AuthDbContext dbContext)
     {
-        return dbContext.Applications;
+        return dbContext.Applications.Where(a => a.IsActive);
     }
 
     [Authorize]
@@ -42,11 +49,12 @@ public class Query
 
     // Users
     [Authorize]
+    [UsePaging(MaxPageSize = 100, DefaultPageSize = 20, IncludeTotalCount = true)]
     [UseFiltering]
     [UseSorting]
     public IQueryable<User> GetUsers([Service] AuthDbContext dbContext)
     {
-        return dbContext.Users;
+        return dbContext.Users.Include(u => u.Application).Where(u => u.IsActive);
     }
 
     [Authorize]
@@ -73,8 +81,8 @@ public class Query
     // Get current authenticated user
     [Authorize]
     public async Task<User?> GetCurrentUser(
-        [Service] AuthDbContext dbContext,
-        ClaimsPrincipal claimsPrincipal)
+        ClaimsPrincipal claimsPrincipal,
+        [Service] AuthDbContext dbContext)
     {
         var userIdClaim = claimsPrincipal.FindFirst("sub");
         if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
@@ -89,11 +97,12 @@ public class Query
 
     // Roles
     [Authorize]
+    [UsePaging(MaxPageSize = 100, DefaultPageSize = 25, IncludeTotalCount = true)]
     [UseFiltering]
     [UseSorting]
     public IQueryable<Role> GetRoles([Service] AuthDbContext dbContext)
     {
-        return dbContext.Roles;
+        return dbContext.Roles.Include(r => r.Application);
     }
 
     [Authorize]
@@ -108,11 +117,15 @@ public class Query
 
     // API Keys
     [Authorize]
+    [UsePaging(MaxPageSize = 100, DefaultPageSize = 25, IncludeTotalCount = true)]
     [UseFiltering]
     [UseSorting]
     public IQueryable<ApiKey> GetApiKeys([Service] AuthDbContext dbContext)
     {
-        return dbContext.ApiKeys;
+        return dbContext.ApiKeys
+            .Include(ak => ak.Application)
+            .Include(ak => ak.OwnerUser)
+            .Where(ak => !ak.IsRevoked);
     }
 
     [Authorize]
@@ -132,7 +145,9 @@ public class Query
     [UseSorting]
     public IQueryable<SessionLog> GetSessionLogs([Service] AuthDbContext dbContext)
     {
-        return dbContext.SessionLogs;
+        return dbContext.SessionLogs
+            .Include(sl => sl.User)
+            .Include(sl => sl.Application);
     }
 
     // Get user roles
@@ -175,6 +190,74 @@ public class Query
             RoleCount = roleCount,
             SessionCount = sessionCount
         };
+    }
+
+    // Get users by application
+    [Authorize]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<User> GetUsersByApplication(
+        Guid applicationId,
+        [Service] AuthDbContext dbContext)
+    {
+        return dbContext.Users
+            .Include(u => u.Application)
+            .Where(u => u.ApplicationId == applicationId);
+    }
+
+    // Get roles by application
+    [Authorize]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Role> GetRolesByApplication(
+        Guid applicationId,
+        [Service] AuthDbContext dbContext)
+    {
+        return dbContext.Roles
+            .Include(r => r.Application)
+            .Where(r => r.ApplicationId == applicationId);
+    }
+
+    // Get API keys by application
+    [Authorize]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<ApiKey> GetApiKeysByApplication(
+        Guid applicationId,
+        [Service] AuthDbContext dbContext)
+    {
+        return dbContext.ApiKeys
+            .Include(ak => ak.Application)
+            .Include(ak => ak.OwnerUser)
+            .Where(ak => ak.ApplicationId == applicationId);
+    }
+
+    // Get session logs by application
+    [Authorize]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<SessionLog> GetSessionLogsByApplication(
+        Guid applicationId,
+        [Service] AuthDbContext dbContext)
+    {
+        return dbContext.SessionLogs
+            .Include(sl => sl.User)
+            .Include(sl => sl.Application)
+            .Where(sl => sl.ApplicationId == applicationId);
+    }
+
+    // Get session logs by user
+    [Authorize]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<SessionLog> GetUserSessionLogs(
+        Guid userId,
+        [Service] AuthDbContext dbContext)
+    {
+        return dbContext.SessionLogs
+            .Include(sl => sl.User)
+            .Include(sl => sl.Application)
+            .Where(sl => sl.UserId == userId);
     }
 }
 

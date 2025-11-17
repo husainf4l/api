@@ -11,8 +11,9 @@ public class UserDataLoader : BatchDataLoader<Guid, User>
 
     public UserDataLoader(
         IBatchScheduler batchScheduler,
+        DataLoaderOptions options,
         IDbContextFactory<AuthDbContext> dbContextFactory)
-        : base(batchScheduler)
+        : base(batchScheduler, options)
     {
         _dbContextFactory = dbContextFactory;
     }

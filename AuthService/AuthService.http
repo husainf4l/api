@@ -1,78 +1,106 @@
 @AuthService_HostAddress = http://localhost:5209
+@GraphQL_Endpoint = {{AuthService_HostAddress}}/auth/graphql
 
 ###
 # Health Check Endpoints
 ###
 
-GET {{AuthService_HostAddress}}/health
+GET {{AuthService_HostAddress}}/auth/health
 Accept: application/json
 
 ###
 
-GET {{AuthService_HostAddress}}/health/live
+GET {{AuthService_HostAddress}}/auth/health/live
 Accept: application/json
 
 ###
 
-GET {{AuthService_HostAddress}}/health/ready
+GET {{AuthService_HostAddress}}/auth/health/ready
 Accept: application/json
 
 ###
-# Authentication Endpoints
+# GraphQL Queries and Mutations
 ###
 
-# Register a new user
-POST {{AuthService_HostAddress}}/auth/register
+# Test GraphQL endpoint
+POST {{GraphQL_Endpoint}}
 Content-Type: application/json
 
 {
-  "email": "test@example.com",
-  "password": "TestPassword123!",
-  "confirmPassword": "TestPassword123!",
-  "applicationCode": "testapp",
-  "phoneNumber": "+1234567890"
+  "query": "query { hello(name: \"GraphQL\") }"
+}
+
+###
+
+# Register a new user
+POST {{GraphQL_Endpoint}}
+Content-Type: application/json
+
+{
+  "query": "mutation RegisterUser($input: RegisterRequestInput!) { registerUser(input: $input) { accessToken refreshToken expiresIn user { id email applicationCode } } }",
+  "variables": {
+    "input": {
+      "email": "test@example.com",
+      "password": "TestPassword123!",
+      "confirmPassword": "TestPassword123!",
+      "applicationCode": "testapp",
+      "phoneNumber": "+1234567890"
+    }
+  }
 }
 
 ###
 
 # Login with registered user
-POST {{AuthService_HostAddress}}/auth/login
+POST {{GraphQL_Endpoint}}
 Content-Type: application/json
 
 {
-  "email": "test@example.com",
-  "password": "TestPassword123!",
-  "applicationCode": "testapp",
-  "deviceInfo": "REST Client Test",
-  "ipAddress": "127.0.0.1",
-  "userAgent": "REST Client"
+  "query": "mutation LoginUser($input: LoginRequestInput!) { loginUser(input: $input) { accessToken refreshToken expiresIn user { id email applicationCode } } }",
+  "variables": {
+    "input": {
+      "email": "test@example.com",
+      "password": "TestPassword123!",
+      "applicationCode": "testapp"
+    }
+  }
 }
 
 ###
 
 # Get current user info (requires Authorization header)
-GET {{AuthService_HostAddress}}/auth/me
+POST {{GraphQL_Endpoint}}
 Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
-Accept: application/json
+Content-Type: application/json
+
+{
+  "query": "query { getCurrentUser { id email application { name code } isEmailVerified createdAt } }"
+}
 
 ###
 
 # Refresh access token
-POST {{AuthService_HostAddress}}/auth/refresh
+POST {{GraphQL_Endpoint}}
 Content-Type: application/json
 
 {
-  "refreshToken": "YOUR_REFRESH_TOKEN_HERE"
+  "query": "mutation RefreshToken($refreshToken: String!) { refreshToken(refreshToken: $refreshToken) { accessToken refreshToken expiresIn } }",
+  "variables": {
+    "refreshToken": "YOUR_REFRESH_TOKEN_HERE"
+  }
 }
 
 ###
 
 # Logout user
-POST {{AuthService_HostAddress}}/auth/logout
+POST {{GraphQL_Endpoint}}
 Content-Type: application/json
 
 {
-  "refreshToken": "YOUR_REFRESH_TOKEN_HERE"
+  "query": "mutation LogoutUser($refreshToken: String!) { logoutUser(refreshToken: $refreshToken) }",
+  "variables": {
+    "refreshToken": "YOUR_REFRESH_TOKEN_HERE"
+  }
 }
 
 ###
@@ -80,279 +108,344 @@ Content-Type: application/json
 ###
 
 # Get all applications
-GET {{AuthService_HostAddress}}/admin/apps
-Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
-Accept: application/json
-
-###
-
-# Get specific application
-GET {{AuthService_HostAddress}}/admin/apps/YOUR_APP_ID_HERE
-Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
-Accept: application/json
-
-###
-
-# Create new application
-POST {{AuthService_HostAddress}}/admin/apps
+POST {{GraphQL_Endpoint}}
 Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
 Content-Type: application/json
 
 {
-  "name": "Test Application",
-  "code": "testapp",
-  "description": "A test application for development"
+  "query": "query { getApplications { id name code isActive createdAt } }"
+}
+
+###
+
+# Get specific application
+POST {{GraphQL_Endpoint}}
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "query": "query GetApplication($id: UUID!) { getApplicationById(id: $id) { id name code isActive createdAt } }",
+  "variables": {
+    "id": "YOUR_APP_ID_HERE"
+  }
+}
+
+###
+
+# Create new application
+POST {{GraphQL_Endpoint}}
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "query": "mutation CreateApplication($name: String!, $code: String!, $description: String) { createApplication(name: $name, code: $code, description: $description) { id name code isActive createdAt } }",
+  "variables": {
+    "name": "Test Application",
+    "code": "testapp",
+    "description": "A test application for development"
+  }
 }
 
 ###
 
 # Update application
-PUT {{AuthService_HostAddress}}/admin/apps/YOUR_APP_ID_HERE
+POST {{GraphQL_Endpoint}}
 Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
 Content-Type: application/json
 
 {
-  "name": "Updated Test Application",
-  "description": "Updated description",
-  "isActive": true
+  "query": "mutation UpdateApplication($id: UUID!, $name: String, $description: String, $isActive: Boolean) { updateApplication(id: $id, name: $name, description: $description, isActive: $isActive) { id name code isActive createdAt } }",
+  "variables": {
+    "id": "YOUR_APP_ID_HERE",
+    "name": "Updated Test Application",
+    "description": "Updated description",
+    "isActive": true
+  }
 }
 
 ###
 
 # Get application statistics
-GET {{AuthService_HostAddress}}/admin/apps/YOUR_APP_ID_HERE/stats
+POST {{GraphQL_Endpoint}}
 Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
-Accept: application/json
+Content-Type: application/json
+
+{
+  "query": "query GetApplicationStats($applicationId: UUID!) { getApplicationStats(applicationId: $applicationId) { applicationId userCount apiKeyCount roleCount sessionCount } }",
+  "variables": {
+    "applicationId": "YOUR_APP_ID_HERE"
+  }
+}
 
 ###
 
 # Delete application
-DELETE {{AuthService_HostAddress}}/admin/apps/YOUR_APP_ID_HERE
+POST {{GraphQL_Endpoint}}
 Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "query": "mutation DeleteApplication($id: UUID!) { deleteApplication(id: $id) }",
+  "variables": {
+    "id": "YOUR_APP_ID_HERE"
+  }
+}
 
 ###
 # User Management (Admin)
 ###
 
 # Get users for application
-GET {{AuthService_HostAddress}}/admin/testapp/users?page=1&pageSize=10
-Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
-Accept: application/json
-
-###
-
-# Search users
-GET {{AuthService_HostAddress}}/admin/testapp/users?page=1&pageSize=10&search=test
-Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
-Accept: application/json
-
-###
-
-# Get specific user
-GET {{AuthService_HostAddress}}/admin/testapp/users/YOUR_USER_ID_HERE
-Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
-Accept: application/json
-
-###
-
-# Update user
-PUT {{AuthService_HostAddress}}/admin/testapp/users/YOUR_USER_ID_HERE
+POST {{GraphQL_Endpoint}}
 Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
 Content-Type: application/json
 
 {
-  "email": "updated@example.com",
-  "phoneNumber": "+1987654321",
-  "isEmailVerified": true,
-  "isActive": true
+  "query": "query GetUsersByApplication($applicationId: UUID!) { getUsersByApplication(applicationId: $applicationId) { id email isEmailVerified isActive createdAt application { name } } }",
+  "variables": {
+    "applicationId": "YOUR_APP_ID_HERE"
+  }
+}
+
+###
+
+# Search users (using GraphQL filtering)
+POST {{GraphQL_Endpoint}}
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "query": "query GetUsersByApplication($applicationId: UUID!) { getUsersByApplication(applicationId: $applicationId, where: { email: { contains: \"test\" } }) { id email isEmailVerified isActive createdAt } }",
+  "variables": {
+    "applicationId": "YOUR_APP_ID_HERE"
+  }
+}
+
+###
+
+# Get specific user
+POST {{GraphQL_Endpoint}}
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "query": "query GetUser($id: UUID!) { getUserById(id: $id) { id email phoneNumber isEmailVerified isActive createdAt application { name code } } }",
+  "variables": {
+    "id": "YOUR_USER_ID_HERE"
+  }
+}
+
+###
+
+# Update user
+POST {{GraphQL_Endpoint}}
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "query": "mutation UpdateUser($id: UUID!, $email: String, $phoneNumber: String, $isEmailVerified: Boolean, $isActive: Boolean) { updateUser(id: $id, email: $email, phoneNumber: $phoneNumber, isEmailVerified: $isEmailVerified, isActive: $isActive) { id email phoneNumber isEmailVerified isActive } }",
+  "variables": {
+    "id": "YOUR_USER_ID_HERE",
+    "email": "updated@example.com",
+    "phoneNumber": "+1987654321",
+    "isEmailVerified": true,
+    "isActive": true
+  }
 }
 
 ###
 
 # Assign role to user
-POST {{AuthService_HostAddress}}/admin/testapp/users/YOUR_USER_ID_HERE/roles
+POST {{GraphQL_Endpoint}}
 Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
 Content-Type: application/json
 
 {
-  "roleName": "admin"
+  "query": "mutation AssignRoleToUser($userId: UUID!, $roleId: UUID!) { assignRoleToUser(userId: $userId, roleId: $roleId) }",
+  "variables": {
+    "userId": "YOUR_USER_ID_HERE",
+    "roleId": "ROLE_ID_HERE"
+  }
 }
 
 ###
 
 # Remove role from user
-DELETE {{AuthService_HostAddress}}/admin/testapp/users/YOUR_USER_ID_HERE/roles/admin
+POST {{GraphQL_Endpoint}}
 Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "query": "mutation RemoveRoleFromUser($userId: UUID!, $roleId: UUID!) { removeRoleFromUser(userId: $userId, roleId: $roleId) }",
+  "variables": {
+    "userId": "YOUR_USER_ID_HERE",
+    "roleId": "ROLE_ID_HERE"
+  }
+}
 
 ###
 
 # Get user roles
-GET {{AuthService_HostAddress}}/admin/testapp/users/YOUR_USER_ID_HERE/roles
+POST {{GraphQL_Endpoint}}
 Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
-Accept: application/json
+Content-Type: application/json
+
+{
+  "query": "query GetUserRoles($userId: UUID!) { getUserRoles(userId: $userId) { id name description } }",
+  "variables": {
+    "userId": "YOUR_USER_ID_HERE"
+  }
+}
 
 ###
 
 # Get user sessions
-GET {{AuthService_HostAddress}}/admin/testapp/users/YOUR_USER_ID_HERE/sessions?page=1&pageSize=10
+POST {{GraphQL_Endpoint}}
 Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
-Accept: application/json
+Content-Type: application/json
+
+{
+  "query": "query GetUserSessions($userId: UUID!) { getUserSessionLogs(userId: $userId) { id loginAt logoutAt ipAddress userAgent isSuccessful } }",
+  "variables": {
+    "userId": "YOUR_USER_ID_HERE"
+  }
+}
 
 ###
 
 # Delete user
-DELETE {{AuthService_HostAddress}}/admin/testapp/users/YOUR_USER_ID_HERE
+POST {{GraphQL_Endpoint}}
 Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "query": "mutation DeleteUser($id: UUID!) { deleteUser(id: $id) }",
+  "variables": {
+    "id": "YOUR_USER_ID_HERE"
+  }
+}
 
 ###
 # API Key Management
 ###
 
 # Get API keys for application
-GET {{AuthService_HostAddress}}/admin/testapp/api-keys?page=1&pageSize=10
-Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
-Accept: application/json
-
-###
-
-# Get specific API key
-GET {{AuthService_HostAddress}}/admin/testapp/api-keys/YOUR_API_KEY_ID_HERE
-Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
-Accept: application/json
-
-###
-
-# Create API key
-POST {{AuthService_HostAddress}}/admin/testapp/api-keys
+POST {{GraphQL_Endpoint}}
 Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
 Content-Type: application/json
 
 {
-  "name": "Test API Key",
-  "scopes": ["read", "write"],
-  "expiresInDays": 30,
-  "environment": "development"
+  "query": "query GetApiKeysByApplication($applicationId: UUID!) { getApiKeysByApplication(applicationId: $applicationId) { id name scopes createdAt expiresAt isActive ownerUser { email } } }",
+  "variables": {
+    "applicationId": "YOUR_APP_ID_HERE"
+  }
+}
+
+###
+
+# Get specific API key
+POST {{GraphQL_Endpoint}}
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "query": "query GetApiKey($id: UUID!) { getApiKeyById(id: $id) { id name scopes createdAt expiresAt isActive ownerUser { email } application { name } } }",
+  "variables": {
+    "id": "YOUR_API_KEY_ID_HERE"
+  }
+}
+
+###
+
+# Create API key
+POST {{GraphQL_Endpoint}}
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "query": "mutation CreateApiKey($applicationId: UUID!, $name: String!, $scopes: [String!], $expiresInDays: Int) { createApiKey(applicationId: $applicationId, name: $name, scopes: $scopes, expiresInDays: $expiresInDays) { id name apiKey scopes expiresAt createdAt } }",
+  "variables": {
+    "applicationId": "YOUR_APP_ID_HERE",
+    "name": "Test API Key",
+    "scopes": ["read", "write"],
+    "expiresInDays": 30
+  }
 }
 
 ###
 
 # Update API key
-PUT {{AuthService_HostAddress}}/admin/testapp/api-keys/YOUR_API_KEY_ID_HERE
+POST {{GraphQL_Endpoint}}
 Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
 Content-Type: application/json
 
 {
-  "name": "Updated API Key",
-  "scopes": ["read"],
-  "expiresInDays": 60
+  "query": "mutation UpdateApiKey($id: UUID!, $name: String, $scopes: [String!]) { updateApiKey(id: $id, name: $name, scopes: $scopes) { id name scopes createdAt expiresAt isActive } }",
+  "variables": {
+    "id": "YOUR_API_KEY_ID_HERE",
+    "name": "Updated API Key",
+    "scopes": ["read"]
+  }
 }
 
 ###
 
 # Revoke API key
-DELETE {{AuthService_HostAddress}}/admin/testapp/api-keys/YOUR_API_KEY_ID_HERE
+POST {{GraphQL_Endpoint}}
 Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "query": "mutation RevokeApiKey($id: UUID!) { revokeApiKey(id: $id) }",
+  "variables": {
+    "id": "YOUR_API_KEY_ID_HERE"
+  }
+}
 
 ###
 # API Key Validation (Internal)
 ###
 
 # Validate API key
-POST {{AuthService_HostAddress}}/internal/validate-api-key
+POST {{GraphQL_Endpoint}}
 Content-Type: application/json
 
 {
-  "apiKey": "YOUR_API_KEY_HERE",
-  "requestedScope": "read",
-  "ipAddress": "127.0.0.1",
-  "userAgent": "Test Client"
+  "query": "mutation ValidateApiKey($apiKey: String!, $requestedScope: String, $ipAddress: String) { validateApiKey(apiKey: $apiKey, requestedScope: $requestedScope, ipAddress: $ipAddress) { isValid message applicationId userId scopes } }",
+  "variables": {
+    "apiKey": "YOUR_API_KEY_HERE",
+    "requestedScope": "read",
+    "ipAddress": "127.0.0.1"
+  }
 }
 
 ###
 # External OAuth Authentication
 ###
+# Note: OAuth flows typically involve redirects and are not well-suited for GraphQL.
+# OAuth authentication is still supported through traditional REST endpoints:
+# POST /auth/external-login (initiate OAuth)
+# GET /auth/external-callback/{provider} (OAuth callback)
+# POST /auth/link-external-login (link OAuth account)
+# POST /auth/unlink-external-login (unlink OAuth account)
+# GET /auth/external-logins (get linked accounts)
 
-# Initiate Google OAuth login
-POST {{AuthService_HostAddress}}/auth/external-login
+# OAuth endpoints remain as REST API since they involve browser redirects
+
+###
+
+# GraphQL Schema Introspection
+###
+
+# Get GraphQL schema (for API documentation)
+POST {{GraphQL_Endpoint}}
 Content-Type: application/json
 
 {
-  "provider": "google",
-  "applicationCode": "testapp",
-  "returnUrl": "http://localhost:3000/callback"
+  "query": "query IntrospectionQuery { __schema { queryType { name } mutationType { name } types { ...FullType } directives { name description locations args { ...InputValue } } } } fragment FullType on __Type { kind name description fields(includeDeprecated: true) { name description args { ...InputValue } type { ...TypeRef } isDeprecated deprecationReason } inputFields { ...InputValue } interfaces { ...TypeRef } enumValues(includeDeprecated: true) { name description isDeprecated deprecationReason } possibleTypes { ...TypeRef } } fragment InputValue on __InputValue { name description type { ...TypeRef } defaultValue } fragment TypeRef on __Type { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name ofType { kind name } } } } } } } }"
 }
 
 ###
 
-# Initiate GitHub OAuth login
-POST {{AuthService_HostAddress}}/auth/external-login
-Content-Type: application/json
-
-{
-  "provider": "github",
-  "applicationCode": "testapp",
-  "returnUrl": "http://localhost:3000/callback"
-}
-
-###
-
-# Initiate Apple Sign-In
-POST {{AuthService_HostAddress}}/auth/external-login
-Content-Type: application/json
-
-{
-  "provider": "apple",
-  "applicationCode": "testapp",
-  "returnUrl": "http://localhost:3000/callback"
-}
-
-###
-
-# External login callback (this would be called by OAuth provider)
-GET {{AuthService_HostAddress}}/auth/external-callback/google
-Accept: application/json
-
-###
-
-# Link external login to existing account (requires auth)
-POST {{AuthService_HostAddress}}/auth/link-external-login
-Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
-Content-Type: application/json
-
-{
-  "provider": "google",
-  "applicationCode": "testapp"
-}
-
-###
-
-# Unlink external login from account (requires auth)
-POST {{AuthService_HostAddress}}/auth/unlink-external-login
-Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
-Content-Type: application/json
-
-{
-  "provider": "google",
-  "applicationCode": "testapp"
-}
-
-###
-
-# Get linked external logins for user (requires auth)
-GET {{AuthService_HostAddress}}/auth/external-logins
-Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
-Accept: application/json
-
-###
-
-# OpenAPI/Swagger Documentation
-###
-
-# Get OpenAPI specification
-GET {{AuthService_HostAddress}}/swagger/v1/swagger.json
-Accept: application/json
-
-###
-
-# Swagger UI (for browser access)
-# Open in browser: {{AuthService_HostAddress}}/swagger
+# GraphQL Playground (for browser-based testing)
+# Open in browser: {{AuthService_HostAddress}}/graphql (when in development mode)

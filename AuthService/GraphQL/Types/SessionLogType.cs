@@ -1,3 +1,4 @@
+using AuthService.GraphQL.DataLoaders;
 using AuthService.Models.Entities;
 using HotChocolate.Types;
 

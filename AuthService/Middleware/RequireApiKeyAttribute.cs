@@ -32,7 +32,7 @@ public class RequireApiKeyAttribute : Attribute, IAsyncActionFilter
         
         if (validationResult == null || !validationResult.IsValid)
         {
-            logger.LogWarning("Invalid API key attempt: {ApiKey}", apiKeyValue);
+            logger.LogWarning("Invalid API key attempt: {ApiKey}", apiKeyValue.ToString() ?? "null");
             context.Result = new UnauthorizedObjectResult(new
             {
                 success = false,

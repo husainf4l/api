@@ -276,6 +276,76 @@ public class AuthService
         await _context.SaveChangesAsync();
     }
 
+    public async Task<TokenResponse?> RefreshTokenAsync(string refreshToken)
+    {
+        try
+        {
+            // Find and validate the refresh token
+            var refreshTokenEntity = await _context.RefreshTokens
+                .Include(rt => rt.User)
+                .Include(rt => rt.Application)
+                .FirstOrDefaultAsync(rt => rt.Token == refreshToken && !rt.RevokedAt.HasValue);
+
+            if (refreshTokenEntity == null || refreshTokenEntity.ExpiresAt <= DateTime.UtcNow)
+            {
+                _logger.LogWarning("Refresh token attempt with invalid or expired token");
+                return null;
+            }
+
+            // Revoke the old refresh token
+            refreshTokenEntity.RevokedAt = DateTime.UtcNow;
+
+            // Generate new tokens
+            var newAccessToken = _jwtTokenService.GenerateAccessToken(refreshTokenEntity.User, refreshTokenEntity.Application, null);
+            var newRefreshToken = _jwtTokenService.GenerateRefreshToken();
+
+            // Create new refresh token entity
+            var newRefreshTokenEntity = new RefreshToken
+            {
+                Token = newRefreshToken,
+                UserId = refreshTokenEntity.UserId,
+                ApplicationId = refreshTokenEntity.ApplicationId,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddDays(7), // From appsettings
+                IpAddress = "GraphQL" // Could be extracted from context if needed
+            };
+
+            _context.RefreshTokens.Add(newRefreshTokenEntity);
+            await _context.SaveChangesAsync();
+
+            // Get user roles for token response
+            var userRole = await GetUserRoleAsync(refreshTokenEntity.UserId);
+
+            var tokenResponse = new TokenResponse
+            {
+                AccessToken = newAccessToken,
+                RefreshToken = newRefreshToken,
+                ExpiresIn = 15 * 60, // 15 minutes from jwt settings
+                ExpiresAt = DateTime.UtcNow.AddMinutes(15),
+                User = new TokenResponse.UserInfo
+                {
+                    Id = refreshTokenEntity.UserId,
+                    Email = refreshTokenEntity.User.Email,
+                    ApplicationId = refreshTokenEntity.ApplicationId,
+                    ApplicationCode = refreshTokenEntity.Application.Code,
+                    ApplicationName = refreshTokenEntity.Application.Name,
+                    Role = userRole,
+                    IsEmailVerified = refreshTokenEntity.User.IsEmailVerified,
+                    CreatedAt = refreshTokenEntity.User.CreatedAt,
+                    LastLoginAt = refreshTokenEntity.User.LastLoginAt
+                }
+            };
+
+            _logger.LogInformation("User {UserId} refreshed tokens successfully", refreshTokenEntity.UserId);
+            return tokenResponse;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during token refresh");
+            return null;
+        }
+    }
+
     public async Task<bool> LogoutUserAsync(string refreshToken)
     {
         try
@@ -319,6 +389,16 @@ public class AuthService
             _logger.LogError(ex, "Error during user logout");
             return false;
         }
+    }
+
+    private async Task<string?> GetUserRoleAsync(Guid userId)
+    {
+        var userRole = await _context.UserRoles
+            .Where(ur => ur.UserId == userId)
+            .Include(ur => ur.Role)
+            .Select(ur => ur.Role.Name)
+            .FirstOrDefaultAsync();
+        return userRole;
     }
 
     public async Task<bool> SendEmailVerificationAsync(string email, Guid applicationId)
