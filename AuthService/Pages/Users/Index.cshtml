@@ -1,0 +1,62 @@
+@page "/admin/users"
+@model AuthService.Pages.Users.IndexModel
+@{
+    ViewData["Title"] = "Users";
+}
+
+<div class="page-header">
+    <h2>User Management</h2>
+    <a href="/admin/users/create" class="btn btn-primary">Create User</a>
+</div>
+
+<div class="search-bar">
+    <input type="text" placeholder="Search users..." class="search-input" />
+    <select class="filter-select">
+        <option>All Users</option>
+        <option>Active</option>
+        <option>Inactive</option>
+        <option>Email Verified</option>
+    </select>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Email Verified</th>
+                <th>Last Login</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in Model.Users)
+            {
+                <tr>
+                    <td>@user.Email</td>
+                    <td>@user.FirstName @user.LastName</td>
+                    <td>
+                        <span class="badge @(user.IsActive ? "badge-success" : "badge-danger")">
+                            @(user.IsActive ? "Active" : "Inactive")
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge @(user.IsEmailVerified ? "badge-success" : "badge-warning")">
+                            @(user.IsEmailVerified ? "Verified" : "Not Verified")
+                        </span>
+                    </td>
+                    <td>@(user.LastLoginAt?.ToString("yyyy-MM-dd HH:mm") ?? "Never")</td>
+                    <td>@user.CreatedAt.ToString("yyyy-MM-dd")</td>
+                    <td>
+                        <a href="/admin/users/@user.Id" class="action-link">View</a>
+                        <a href="/admin/users/@user.Id/edit" class="action-link">Edit</a>
+                        <a href="/admin/users/@user.Id/delete" class="action-link text-danger">Delete</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

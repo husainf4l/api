@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - AuthService Admin</title>
+    <link rel="stylesheet" href="~/css/admin.css" />
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>AuthService</h1>
+                <p>Admin Dashboard</p>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/admin" class="nav-item">Dashboard</a>
+                <a href="/admin/users" class="nav-item">Users</a>
+                <a href="/admin/applications" class="nav-item">Applications</a>
+                <a href="/admin/sessions" class="nav-item">Sessions</a>
+                <a href="/admin/tokens" class="nav-item">Tokens</a>
+                <a href="/admin/audit" class="nav-item">Audit Logs</a>
+            </nav>
+        </aside>
+        <main class="main-content">
+            <header class="top-bar">
+                <h2>@ViewData["Title"]</h2>
+                <div class="user-menu">
+                    <span>Admin</span>
+                    <a href="/admin/logout">Logout</a>
+                </div>
+            </header>
+            <div class="content">
+                @RenderBody()
+            </div>
+        </main>
+    </div>
+    <script src="~/js/admin.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

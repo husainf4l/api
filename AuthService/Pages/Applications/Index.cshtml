@@ -1,0 +1,87 @@
+@page "/admin/applications"
+@model AuthService.Pages.Applications.IndexModel
+@{
+    ViewData["Title"] = "Applications";
+}
+
+<div class="page-header">
+    <h2>Application Management</h2>
+    <button class="btn btn-primary" onclick="showCreateModal()">Register Application</button>
+</div>
+
+<div class="cards-grid">
+    @foreach (var app in Model.Applications)
+    {
+        <div class="app-card">
+            <div class="app-card-header">
+                <h3>@app.Name</h3>
+                <span class="badge @(app.IsActive ? "badge-success" : "badge-danger")">
+                    @(app.IsActive ? "Active" : "Inactive")
+                </span>
+            </div>
+            <div class="app-card-body">
+                <p class="app-description">@app.Description</p>
+                <div class="app-info">
+                    <div class="info-item">
+                        <span class="label">Client ID:</span>
+                        <code>@app.ClientId</code>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Created:</span>
+                        <span>@app.CreatedAt.ToString("yyyy-MM-dd")</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Scopes:</span>
+                        <div class="tags">
+                            @foreach (var scope in app.AllowedScopes)
+                            {
+                                <span class="tag">@scope</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Origins:</span>
+                        <div class="tags">
+                            @foreach (var origin in app.AllowedOrigins)
+                            {
+                                <span class="tag">@origin</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="app-card-footer">
+                <a href="/admin/applications/@app.Id/sessions" class="action-link">View Sessions</a>
+                <a href="/admin/applications/@app.Id/edit" class="action-link">Edit</a>
+            </div>
+        </div>
+    }
+</div>
+
+<div id="createModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h3>Register New Application</h3>
+        <form method="post">
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" name="name" required />
+            </div>
+            <div class="form-group">
+                <label>Client ID</label>
+                <input type="text" name="clientId" required />
+            </div>
+            <div class="form-group">
+                <label>Client Secret</label>
+                <input type="password" name="clientSecret" required />
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea name="description"></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="button" onclick="hideCreateModal()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Register</button>
+            </div>
+        </form>
+    </div>
+</div>

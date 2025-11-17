@@ -1,6 +1,82 @@
 @AuthService_HostAddress = http://localhost:5067
 
-GET {{AuthService_HostAddress}}/weatherforecast/
+### Health Check
+GET {{AuthService_HostAddress}}/health
 Accept: application/json
+
+###############################################
+# Application Management
+###############################################
+
+### Register Email Service Application
+POST {{AuthService_HostAddress}}/api/applications/register
+Content-Type: application/json
+
+{
+  "name": "Email Service",
+  "clientId": "email-service-client",
+  "clientSecret": "email-service-secret-123",
+  "description": "Main email marketing and campaign service",
+  "allowedOrigins": ["http://localhost:3000", "http://localhost:5173"],
+  "allowedScopes": ["email:send", "email:read", "campaigns:manage"]
+}
+
+### Get All Applications
+GET {{AuthService_HostAddress}}/api/applications
+Accept: application/json
+
+###############################################
+# Authentication (with Application Context)
+###############################################
+
+### Register a new user (with clientId)
+POST {{AuthService_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Test123!@#",
+  "firstName": "Test",
+  "lastName": "User",
+  "clientId": "email-service-client"
+}
+
+### Login (with clientId to track application)
+POST {{AuthService_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Test123!@#",
+  "clientId": "email-service-client"
+}
+
+### Refresh Token
+POST {{AuthService_HostAddress}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "YOUR_REFRESH_TOKEN_HERE"
+}
+
+### Validate Token
+POST {{AuthService_HostAddress}}/api/auth/validate
+Content-Type: application/json
+
+{
+  "accessToken": "YOUR_ACCESS_TOKEN_HERE"
+}
+
+### Revoke Token (Logout)
+POST {{AuthService_HostAddress}}/api/auth/revoke
+Content-Type: application/json
+
+{
+  "refreshToken": "YOUR_REFRESH_TOKEN_HERE"
+}
+
+### Get Current User (requires Authorization header)
+GET {{AuthService_HostAddress}}/api/auth/me
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
 
 ###

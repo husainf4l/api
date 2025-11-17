@@ -1,0 +1,76 @@
+@page "/admin/audit"
+@model AuthService.Pages.Audit.IndexModel
+@{
+    ViewData["Title"] = "Audit Logs";
+}
+
+<div class="page-header">
+    <h2>Audit Logs</h2>
+    <div class="date-range">
+        <input type="date" class="date-input" />
+        <span>to</span>
+        <input type="date" class="date-input" />
+        <button class="btn btn-primary">Filter</button>
+    </div>
+</div>
+
+<div class="filters">
+    <select class="filter-select">
+        <option>All Events</option>
+        <option>Login</option>
+        <option>Logout</option>
+        <option>Register</option>
+        <option>Token Refresh</option>
+        <option>Password Change</option>
+        <option>Failed Login</option>
+    </select>
+    <select class="filter-select">
+        <option>All Users</option>
+    </select>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Event Type</th>
+                <th>User</th>
+                <th>Application</th>
+                <th>IP Address</th>
+                <th>User Agent</th>
+                <th>Status</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var log in Model.AuditLogs)
+            {
+                <tr>
+                    <td>@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                    <td>
+                        <span class="event-badge event-@log.EventType.ToLower()">@log.EventType</span>
+                    </td>
+                    <td>@log.UserEmail</td>
+                    <td>@log.Application</td>
+                    <td>@log.IpAddress</td>
+                    <td class="user-agent">@log.UserAgent</td>
+                    <td>
+                        <span class="badge @(log.Success ? "badge-success" : "badge-danger")">
+                            @(log.Success ? "Success" : "Failed")
+                        </span>
+                    </td>
+                    <td>
+                        <button onclick="showDetails('@log.Id')" class="btn-link">View</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination">
+    <button class="btn btn-secondary">Previous</button>
+    <span>Page 1 of @Model.TotalPages</span>
+    <button class="btn btn-secondary">Next</button>
+</div>

@@ -1,0 +1,164 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    color: #1d1d1f;
+    background: #f5f5f7;
+}
+
+.layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: 260px;
+    background: #fff;
+    border-right: 1px solid #d2d2d7;
+    padding: 24px 0;
+    position: fixed;
+    height: 100vh;
+    overflow-y: auto;
+}
+
+.sidebar-header {
+    padding: 0 24px 24px;
+    border-bottom: 1px solid #d2d2d7;
+}
+
+.sidebar-header h1 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.sidebar-header p {
+    font-size: 14px;
+    color: #86868b;
+}
+
+.sidebar-nav {
+    padding: 16px 0;
+}
+
+.nav-item {
+    display: block;
+    padding: 12px 24px;
+    color: #1d1d1f;
+    text-decoration: none;
+    font-size: 15px;
+    transition: background 0.2s;
+}
+
+.nav-item:hover {
+    background: #f5f5f7;
+}
+
+.main-content {
+    margin-left: 260px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.top-bar {
+    background: #fff;
+    border-bottom: 1px solid #d2d2d7;
+    padding: 16px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.top-bar h2 {
+    font-size: 28px;
+    font-weight: 600;
+}
+
+.user-menu {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.user-menu a {
+    color: #06c;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.content {
+    padding: 32px;
+    flex: 1;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+}
+
+.stat-card {
+    background: #fff;
+    padding: 24px;
+    border-radius: 12px;
+    border: 1px solid #d2d2d7;
+}
+
+.stat-card h3 {
+    font-size: 14px;
+    color: #86868b;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.stat-number {
+    font-size: 36px;
+    font-weight: 600;
+}
+
+.recent-activity {
+    background: #fff;
+    padding: 24px;
+    border-radius: 12px;
+    border: 1px solid #d2d2d7;
+}
+
+.recent-activity h3 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 16px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+thead th {
+    text-align: left;
+    padding: 12px;
+    border-bottom: 1px solid #d2d2d7;
+    font-size: 13px;
+    color: #86868b;
+    font-weight: 500;
+}
+
+tbody td {
+    padding: 12px;
+    border-bottom: 1px solid #f5f5f7;
+    font-size: 14px;
+}
+
+tbody tr:last-child td {
+    border-bottom: none;
+}
+
+tbody tr:hover {
+    background: #f5f5f7;
+}

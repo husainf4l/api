@@ -1,0 +1,53 @@
+@page "/admin"
+@model AuthService.Pages.IndexModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="dashboard">
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Total Users</h3>
+            <p class="stat-number">@Model.TotalUsers</p>
+        </div>
+        <div class="stat-card">
+            <h3>Active Sessions</h3>
+            <p class="stat-number">@Model.ActiveSessions</p>
+        </div>
+        <div class="stat-card">
+            <h3>Applications</h3>
+            <p class="stat-number">@Model.TotalApplications</p>
+        </div>
+        <div class="stat-card">
+            <h3>Logins Today</h3>
+            <p class="stat-number">@Model.LoginsToday</p>
+        </div>
+    </div>
+
+    <div class="recent-activity">
+        <h3>Recent Activity</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Application</th>
+                    <th>IP Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var activity in Model.RecentActivities)
+                {
+                    <tr>
+                        <td>@activity.Timestamp.ToString("HH:mm:ss")</td>
+                        <td>@activity.UserEmail</td>
+                        <td>@activity.Action</td>
+                        <td>@activity.Application</td>
+                        <td>@activity.IpAddress</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
