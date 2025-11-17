@@ -1,0 +1,28 @@
+# Environment variables
+.env
+*.env
+
+# Build results
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Rider
+.idea/
+
+# User-specific files
+*.rsuser
+*.userosscache
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
